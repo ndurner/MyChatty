@@ -1,6 +1,8 @@
 # MyChatty
 
-![MyChatty rendering a real Gemma Markdown conversation](docs/assets/mychatty-hero.png)
+<p align="center">
+  <img src="docs/assets/mychatty-hero.png" alt="MyChatty rendering a real Gemma Markdown conversation" width="420">
+</p>
 
 MyChatty is a Qt Quick AI chat client backed by a shared C++ core library. It
 was started as a cross-platform Qt implementation of a ChatGPT-like app with a
