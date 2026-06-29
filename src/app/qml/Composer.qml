@@ -73,6 +73,7 @@ Item {
                 spacing: 8
 
                 Button {
+                    id: addButton
                     width: 42
                     height: 42
                     anchors.verticalCenter: parent.verticalCenter
@@ -85,7 +86,7 @@ Item {
 
                 TextArea {
                     id: textArea
-                    width: parent.width - 152
+                    width: Math.max(0, parent.width - addButton.width - micButton.width - sendButton.width - 32)
                     anchors.verticalCenter: parent.verticalCenter
                     placeholderText: "Ask AI"
                     textFormat: TextEdit.PlainText
@@ -109,15 +110,12 @@ Item {
                     width: 40
                     height: 40
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "♩"
-                    font.pixelSize: 24
                     onClicked: controller.notifyNotImplemented("Microphone")
-                    contentItem: Text {
-                        text: micButton.text
-                        color: "#111111"
-                        font: micButton.font
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    contentItem: Item {
+                        MicrophoneIcon {
+                            anchors.centerIn: parent
+                            color: "#111111"
+                        }
                     }
                     background: Rectangle { radius: 20; color: "transparent" }
                 }

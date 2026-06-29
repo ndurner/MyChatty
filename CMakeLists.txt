@@ -63,8 +63,10 @@ qt_add_qml_module(MyChatty
         src/app/qml/AttachmentMenuRow.qml
         src/app/qml/ChatBubble.qml
         src/app/qml/Composer.qml
+        src/app/qml/Chevron.qml
         src/app/qml/IconButton.qml
         src/app/qml/LabeledSecretField.qml
+        src/app/qml/MicrophoneIcon.qml
         src/app/qml/ModelEffortSelector.qml
         src/app/qml/SettingsSheet.qml
         src/app/qml/Sidebar.qml

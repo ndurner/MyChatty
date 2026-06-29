@@ -146,24 +146,35 @@ Popup {
                         radius: 26
                         color: "#ffffff"
                     }
-                    contentItem: Row {
+                    contentItem: Item {
                         anchors.fill: parent
-                        anchors.leftMargin: 22
-                        anchors.rightMargin: 22
                         Text {
-                            width: parent.width - 42
+                            anchors.left: parent.left
+                            anchors.leftMargin: 22
+                            anchors.right: disclosure.left
+                            anchors.rightMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
                             text: "Personalization"
                             color: "#111111"
                             font.pixelSize: 23
                             verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
                         }
-                        Text {
+                        Item {
+                            id: disclosure
+                            anchors.right: parent.right
+                            anchors.rightMargin: 22
+                            anchors.verticalCenter: parent.verticalCenter
                             width: 32
-                            text: ">"
-                            color: "#bbbbbb"
-                            font.pixelSize: 28
-                            verticalAlignment: Text.AlignVCenter
-                            horizontalAlignment: Text.AlignRight
+                            height: parent.height
+
+                            Chevron {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                direction: "right"
+                                color: "#bbbbbb"
+                                strokeWidth: 2.3
+                            }
                         }
                     }
                 }

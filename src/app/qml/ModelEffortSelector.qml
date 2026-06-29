@@ -11,7 +11,7 @@ Popup {
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     width: Math.min(300, parent ? parent.width - 72 : 300)
-    height: modelMode ? 454 : 392
+    height: modelMode ? 486 : 512
     x: parent ? (parent.width - width) / 2 : 80
     y: 78
 
@@ -33,20 +33,31 @@ Popup {
             padding: 0
             onClicked: root.modelMode = !root.modelMode
             background: Rectangle { color: "transparent" }
-            contentItem: Row {
+            contentItem: Item {
                 Text {
-                    width: parent.width - 36
+                    anchors.left: parent.left
+                    anchors.right: chevronWrap.left
+                    anchors.verticalCenter: parent.verticalCenter
                     text: controller.selectedMenuTitle
                     font.pixelSize: 22
                     font.weight: Font.Bold
                     color: "#111111"
                     verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
                 }
-                Text {
-                    text: root.modelMode ? "v" : ">"
-                    font.pixelSize: 28
-                    color: "#111111"
-                    verticalAlignment: Text.AlignVCenter
+                Item {
+                    id: chevronWrap
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 36
+                    height: parent.height
+
+                    Chevron {
+                        anchors.centerIn: parent
+                        direction: root.modelMode ? "down" : "right"
+                        color: "#111111"
+                        strokeWidth: 2.5
+                    }
                 }
             }
         }
@@ -83,19 +94,27 @@ Popup {
                         radius: 14
                         color: down ? "#e6e6e6" : "transparent"
                     }
-                    contentItem: Row {
+                    contentItem: Item {
                         Text {
+                            id: effortCheck
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
                             width: 36
                             text: controller.selectedEffort === modelData ? "✓" : ""
                             font.pixelSize: 20
                             color: "#111111"
                             verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignLeft
                         }
                         Text {
+                            anchors.left: effortCheck.right
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
                             text: modelData
                             font.pixelSize: 22
                             color: "#111111"
                             verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
                         }
                     }
                 }
@@ -120,19 +139,27 @@ Popup {
                         radius: 14
                         color: down ? "#e6e6e6" : "transparent"
                     }
-                    contentItem: Row {
+                    contentItem: Item {
                         Text {
+                            id: modelCheck
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
                             width: 36
                             text: controller.selectedModel === modelData.displayName ? "✓" : ""
                             font.pixelSize: 20
                             color: "#111111"
                             verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignLeft
                         }
                         Text {
+                            anchors.left: modelCheck.right
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
                             text: modelData.displayName
                             font.pixelSize: 22
                             color: "#111111"
                             verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
                         }
                     }
                 }
