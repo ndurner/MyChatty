@@ -1,0 +1,9 @@
+build*/
+.DS_Store
+*.user
+*.user.*
+*.xcuserstate
+*.xcworkspace
+DerivedData/
+cmake-build-*/
+Testing/
