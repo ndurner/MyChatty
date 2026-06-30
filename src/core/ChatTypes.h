@@ -53,7 +53,9 @@ struct ChatRequest {
     QString effort;
     QString customInstructions;
     QString apiKey;
+    QString exaApiKey;
     bool enableWebSearch = false;
+    bool useExaSearch = false;
     int maxOutputTokens = 0;
     bool stream = true;
 };

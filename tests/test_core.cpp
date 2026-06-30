@@ -74,6 +74,73 @@ private slots:
         QVERIFY(payload.value("instructions").toString().contains("Be terse."));
     }
 
+    void responsesPayloadSupportsNativeWebSearch()
+    {
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "what changed today?";
+        ChatRequest request;
+        request.history = {user};
+        request.model = ModelCatalog::modelForDisplayName("5.4-mini");
+        request.effort = "Medium";
+        request.enableWebSearch = true;
+
+        const QJsonObject payload = buildOpenaiResponsesPayload(request);
+        const QJsonArray tools = payload.value("tools").toArray();
+        QCOMPARE(tools.size(), 1);
+        QCOMPARE(tools.first().toObject().value("type").toString(), QString("web_search"));
+        QVERIFY(payload.value("include").toArray().contains("web_search_call.action.sources"));
+    }
+
+    void responsesPayloadSupportsExaMcpSearch()
+    {
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "what changed today?";
+        ChatRequest request;
+        request.history = {user};
+        request.model = ModelCatalog::modelForDisplayName("5.4-mini");
+        request.effort = "Medium";
+        request.exaApiKey = "exa-test-key";
+        request.enableWebSearch = true;
+        request.useExaSearch = true;
+
+        const QJsonObject payload = buildOpenaiResponsesPayload(request);
+        const QJsonObject tool = payload.value("tools").toArray().first().toObject();
+        QCOMPARE(tool.value("type").toString(), QString("mcp"));
+        QCOMPARE(tool.value("server_label").toString(), QString("exa"));
+        QCOMPARE(tool.value("server_url").toString(), QString("https://mcp.exa.ai/mcp?exaApiKey=exa-test-key"));
+        QCOMPARE(tool.value("require_approval").toString(), QString("never"));
+        QVERIFY(!tool.contains("allowed_tools"));
+    }
+
+    void openRouterPayloadSupportsWebSearchEngines()
+    {
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "what changed today?";
+        ChatRequest request;
+        request.history = {user};
+        request.model = ModelCatalog::modelForDisplayName("Gemma 4 Free");
+        request.effort = "Medium";
+        request.enableWebSearch = true;
+
+        QJsonObject payload = buildOpenaiChatPayload(request);
+        QJsonObject plugin = payload.value("plugins").toArray().first().toObject();
+        QCOMPARE(plugin.value("id").toString(), QString("web"));
+        QVERIFY(!plugin.contains("engine"));
+        QCOMPARE(payload.value("web_search_options").toObject().value("search_context_size").toString(), QString("medium"));
+        QVERIFY(!payload.contains("tools"));
+
+        request.useExaSearch = true;
+        payload = buildOpenaiChatPayload(request);
+        plugin = payload.value("plugins").toArray().first().toObject();
+        QCOMPARE(plugin.value("engine").toString(), QString("exa"));
+    }
+
     void markdownRendersBoldAndCodeFence()
     {
         const QString html = MarkdownRenderer::render("### Title\n\n**bold** and `inline`\n\n<pre>\n```cpp\nint x = 1 < 2;\n```\n</pre>");

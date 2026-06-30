@@ -159,6 +159,9 @@ void ChatController::sendMessage(const QString &text)
     request.effort = m_selectedEffort;
     request.customInstructions = m_settings ? m_settings->customInstructions() : QString();
     request.apiKey = apiKeyForModel(request.model);
+    request.exaApiKey = m_settings ? m_settings->exaKey() : QString();
+    request.enableWebSearch = !m_settings || m_settings->webSearchEnabled();
+    request.useExaSearch = m_settings && m_settings->exaSearchEnabled();
     request.stream = true;
 
     ChatMessage assistant;

@@ -6,8 +6,29 @@
 #include <QJsonDocument>
 #include <QMimeDatabase>
 #include <QRandomGenerator>
+#include <QUrl>
+#include <QUrlQuery>
 
 namespace MyChatty {
+
+static constexpr auto ExaMcpServerUrl = "https://mcp.exa.ai/mcp";
+
+static QString exaMcpServerUrl(const QString &configuredApiKey)
+{
+    QString apiKey = configuredApiKey.trimmed();
+    if (apiKey.isEmpty()) {
+        apiKey = QString::fromUtf8(qgetenv("EXA_API_KEY")).trimmed();
+    }
+    if (apiKey.isEmpty()) {
+        return QString::fromLatin1(ExaMcpServerUrl);
+    }
+
+    QUrl url(QString::fromLatin1(ExaMcpServerUrl));
+    QUrlQuery query(url);
+    query.addQueryItem("exaApiKey", apiKey);
+    url.setQuery(query);
+    return url.toString();
+}
 
 QString newId(const QString &prefix)
 {
@@ -262,11 +283,21 @@ QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
         body["max_output_tokens"] = request.maxOutputTokens;
     }
     if (request.enableWebSearch) {
-        body["tools"] = QJsonArray{QJsonObject{
-            {"type", "web_search"},
-            {"search_context_size", "medium"},
-        }};
-        body["include"] = QJsonArray{"reasoning.encrypted_content", "web_search_call.action.sources"};
+        if (request.useExaSearch) {
+            body["tools"] = QJsonArray{QJsonObject{
+                {"type", "mcp"},
+                {"server_label", "exa"},
+                {"server_description", "Exa web search and webpage fetch tools."},
+                {"server_url", exaMcpServerUrl(request.exaApiKey)},
+                {"require_approval", "never"},
+            }};
+        } else {
+            body["tools"] = QJsonArray{QJsonObject{
+                {"type", "web_search"},
+                {"search_context_size", "medium"},
+            }};
+            body["include"] = QJsonArray{"reasoning.encrypted_content", "web_search_call.action.sources"};
+        }
     }
     return body;
 }
@@ -303,6 +334,16 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
     };
     if (request.maxOutputTokens > 0) {
         body["max_tokens"] = request.maxOutputTokens;
+    }
+    if (request.enableWebSearch) {
+        QJsonObject webPlugin{{"id", "web"}};
+        if (request.useExaSearch) {
+            webPlugin["engine"] = "exa";
+        }
+        body["plugins"] = QJsonArray{webPlugin};
+        body["web_search_options"] = QJsonObject{
+            {"search_context_size", "medium"},
+        };
     }
     if (!request.model.providerOnly.isEmpty()) {
         QJsonArray providers;

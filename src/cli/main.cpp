@@ -39,6 +39,12 @@ static QString openRouterKey()
     return QString::fromUtf8(env).trimmed();
 }
 
+static QString exaKey()
+{
+    const QByteArray env = qgetenv("EXA_API_KEY");
+    return QString::fromUtf8(env).trimmed();
+}
+
 static QString cachePath(const QString &key)
 {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/cli-cache";
@@ -71,7 +77,8 @@ int main(int argc, char *argv[])
         {{"f", "file"}, "Read prompt text from a file.", "file"},
         {{"i", "instructions"}, "Custom instructions.", "instructions"},
         {{"t", "max-tokens"}, "Maximum output tokens.", "tokens", "256"},
-        {"web-search", "Enable OpenAI Responses web_search for OpenAI calls."},
+        {"web-search", "Enable web search for provider calls."},
+        {"exa-search", "Use Exa for web search instead of provider-native search."},
         {"json", "Print result JSON instead of streaming plain text."},
         {"dry-run", "Print the JSON request payload and exit."},
         {"no-cache", "Bypass and overwrite the CLI response cache."},
@@ -114,7 +121,9 @@ int main(int argc, char *argv[])
     request.effort = parser.value("effort");
     request.customInstructions = parser.value("instructions");
     request.maxOutputTokens = parser.value("max-tokens").toInt();
-    request.enableWebSearch = parser.isSet("web-search") && model.provider == ApiProvider::OpenAIResponses;
+    request.exaApiKey = exaKey();
+    request.enableWebSearch = parser.isSet("web-search");
+    request.useExaSearch = parser.isSet("exa-search");
     request.stream = true;
     request.apiKey = model.provider == ApiProvider::OpenRouterChat ? openRouterKey() : openAIKey();
 

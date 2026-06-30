@@ -95,85 +95,171 @@ Popup {
                 }
             }
 
-            Column {
+            Flickable {
                 visible: page === "settings"
                 width: parent.width
-                spacing: 24
+                height: parent.height - 80
+                contentWidth: width
+                contentHeight: settingsContent.height
+                clip: true
 
-                Text {
-                    text: "Providers"
-                    color: "#969696"
-                    font.pixelSize: 21
-                    font.weight: Font.Bold
-                    leftPadding: 18
-                }
-                Rectangle {
+                Column {
+                    id: settingsContent
                     width: parent.width
-                    height: 232
-                    radius: 26
-                    color: "#ffffff"
-                    Column {
-                        anchors.fill: parent
-                        anchors.margins: 18
-                        spacing: 12
-                        LabeledSecretField {
-                            width: parent.width
-                            label: "OpenAI API Key"
-                            text: store.openAIKey
-                            onEdited: store.openAIKey = text
-                        }
-                        LabeledSecretField {
-                            width: parent.width
-                            label: "OpenRouter API Key"
-                            text: store.openRouterKey
-                            onEdited: store.openRouterKey = text
-                        }
+                    spacing: 24
+
+                    Text {
+                        text: "Providers"
+                        color: "#969696"
+                        font.pixelSize: 21
+                        font.weight: Font.Bold
+                        leftPadding: 18
                     }
-                }
-
-                Text {
-                    text: "Customize"
-                    color: "#969696"
-                    font.pixelSize: 21
-                    font.weight: Font.Bold
-                    leftPadding: 18
-                }
-                Button {
-                    width: parent.width
-                    height: 76
-                    onClicked: page = "personalization"
-                    background: Rectangle {
+                    Rectangle {
+                        width: parent.width
+                        height: 328
                         radius: 26
                         color: "#ffffff"
-                    }
-                    contentItem: Item {
-                        anchors.fill: parent
-                        Text {
-                            anchors.left: parent.left
-                            anchors.leftMargin: 22
-                            anchors.right: disclosure.left
-                            anchors.rightMargin: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Personalization"
-                            color: "#111111"
-                            font.pixelSize: 23
-                            verticalAlignment: Text.AlignVCenter
-                            elide: Text.ElideRight
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 12
+                            LabeledSecretField {
+                                width: parent.width
+                                label: "OpenAI API Key"
+                                text: store.openAIKey
+                                onEdited: store.openAIKey = text
+                            }
+                            LabeledSecretField {
+                                width: parent.width
+                                label: "OpenRouter API Key"
+                                text: store.openRouterKey
+                                onEdited: store.openRouterKey = text
+                            }
+                            LabeledSecretField {
+                                width: parent.width
+                                label: "Exa API Key"
+                                text: store.exaKey
+                                onEdited: store.exaKey = text
+                            }
                         }
-                        Item {
-                            id: disclosure
-                            anchors.right: parent.right
-                            anchors.rightMargin: 22
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 32
-                            height: parent.height
+                    }
 
-                            Chevron {
-                                anchors.right: parent.right
+                    Text {
+                        text: "Search"
+                        color: "#969696"
+                        font.pixelSize: 21
+                        font.weight: Font.Bold
+                        leftPadding: 18
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 144
+                        radius: 26
+                        color: "#ffffff"
+                        Column {
+                            anchors.fill: parent
+                            anchors.leftMargin: 22
+                            anchors.rightMargin: 18
+                            spacing: 0
+
+                            Item {
+                                width: parent.width
+                                height: 72
+                                Text {
+                                    anchors.left: parent.left
+                                    anchors.right: webSearchSwitch.left
+                                    anchors.rightMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "Web Search"
+                                    color: "#111111"
+                                    font.pixelSize: 22
+                                    elide: Text.ElideRight
+                                }
+                                Switch {
+                                    id: webSearchSwitch
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    checked: store.webSearchEnabled
+                                    onToggled: store.webSearchEnabled = checked
+                                }
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 1
+                                color: "#eeeeee"
+                            }
+
+                            Item {
+                                width: parent.width
+                                height: 71
+                                Text {
+                                    anchors.left: parent.left
+                                    anchors.right: exaSearchSwitch.left
+                                    anchors.rightMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "Use Exa"
+                                    color: webSearchSwitch.checked ? "#111111" : "#aaaaaa"
+                                    font.pixelSize: 22
+                                    elide: Text.ElideRight
+                                }
+                                Switch {
+                                    id: exaSearchSwitch
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    enabled: webSearchSwitch.checked
+                                    checked: store.exaSearchEnabled
+                                    onToggled: store.exaSearchEnabled = checked
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "Customize"
+                        color: "#969696"
+                        font.pixelSize: 21
+                        font.weight: Font.Bold
+                        leftPadding: 18
+                    }
+                    Button {
+                        width: parent.width
+                        height: 76
+                        onClicked: page = "personalization"
+                        background: Rectangle {
+                            radius: 26
+                            color: "#ffffff"
+                        }
+                        contentItem: Item {
+                            anchors.fill: parent
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 22
+                                anchors.right: disclosure.left
+                                anchors.rightMargin: 8
                                 anchors.verticalCenter: parent.verticalCenter
-                                direction: "right"
-                                color: "#bbbbbb"
-                                strokeWidth: 2.3
+                                text: "Personalization"
+                                color: "#111111"
+                                font.pixelSize: 23
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                            }
+                            Item {
+                                id: disclosure
+                                anchors.right: parent.right
+                                anchors.rightMargin: 22
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 32
+                                height: parent.height
+
+                                Chevron {
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    direction: "right"
+                                    color: "#bbbbbb"
+                                    strokeWidth: 2.3
+                                }
                             }
                         }
                     }
