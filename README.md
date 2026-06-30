@@ -26,6 +26,8 @@ without duplicating request serialization or streaming parsing code.
   free Gemma test model.
 - GLM-5.2 routing through OpenRouter with Parasail pinned as the provider.
 - Settings for OpenAI and OpenRouter API keys plus Custom instructions.
+- Web search settings for provider-backed search and optional
+  [Exa](https://exa.ai/) search.
 - Local conversation persistence with a Recents sidebar.
 - Share/export to an `oai_chat`-style JSON shape: a top-level `messages` array
   containing system, user, and assistant messages.
@@ -58,6 +60,7 @@ The main build targets are:
 - API keys for live provider calls:
   - `OPENAI_API_KEY` for OpenAI Responses and text-to-speech.
   - `OPENROUTER_API_KEY` for OpenRouter.
+  - `EXA_API_KEY` for OpenAI Exa MCP calls when using a private Exa key.
 
 The app stores keys in `QSettings` through the Settings sheet. The CLI reads
 API keys from the same environment variables.
@@ -140,7 +143,9 @@ Useful options:
 - `--effort "Medium"`: selects the reasoning/effort mapping.
 - `--max-tokens 256`: caps output tokens.
 - `--instructions "..."`: adds custom instructions.
-- `--web-search`: enables OpenAI Responses web search for OpenAI calls.
+- `--web-search`: enables web search for OpenAI and OpenRouter calls.
+- `--exa-search`: uses [Exa](https://exa.ai/) for web search instead of the
+  provider/default search path.
 - `--json`: prints text, reasoning, raw output items, raw response, raw events,
   and usage as JSON.
 - `--no-cache`: bypasses the CLI response cache.
@@ -165,6 +170,16 @@ https://openrouter.ai/api/v1/chat/completions
 This split is reflected in the code names: `OpenaiResponsesAPI` for OpenAI's
 Responses API and `OpenaiChatAPI` for the OpenAI-compatible chat-completions
 schema used by OpenRouter.
+
+Web search is controlled by two settings. `Web Search` is enabled by default.
+When `Use Exa` is disabled, OpenAI uses the Responses API `web_search` tool and
+OpenRouter uses its `web` plugin without forcing an engine; forcing
+`engine: "native"` can fail on models that do not support native provider
+search. When `Use Exa` is enabled, OpenAI uses [Exa](https://exa.ai/) through
+the remote MCP server at `https://mcp.exa.ai/mcp`, while OpenRouter uses its own
+web plugin with `engine: "exa"`; this is not the Exa MCP path. The optional Exa
+API key is attached to the OpenAI MCP URL and can also be supplied to the CLI as
+`EXA_API_KEY`.
 
 ## Storage And Export
 
