@@ -22,9 +22,9 @@ without duplicating request serialization or streaming parsing code.
   tables, links, and bare URLs.
 - Streaming OpenAI Responses API client in `OpenaiResponsesAPI`.
 - Streaming OpenRouter chat-completions client in `OpenaiChatAPI`.
-- Model catalog entries for GPT-5.5, GPT-5.4 mini, GPT-5.5 Pro, GLM-5.2, and a
-  free Gemma test model.
-- GLM-5.2 routing through OpenRouter with Parasail pinned as the provider.
+- Model catalog entries for GPT-5.5, GPT-5.4 mini, GPT-5.5 Pro, GLM-5.2,
+  Kimi K2.6, and a free Gemma test model.
+- OpenRouter provider pinning for GLM-5.2 and Kimi K2.6.
 - Settings for OpenAI and OpenRouter API keys plus Custom instructions.
 - Web search settings for provider-backed search and optional
   [Exa](https://exa.ai/) search.
@@ -170,6 +170,17 @@ https://openrouter.ai/api/v1/chat/completions
 This split is reflected in the code names: `OpenaiResponsesAPI` for OpenAI's
 Responses API and `OpenaiChatAPI` for the OpenAI-compatible chat-completions
 schema used by OpenRouter.
+
+The built-in model catalog currently contains:
+
+| Display name | API model | API provider | Pinned provider |
+| --- | --- | --- | --- |
+| GPT-5.5 | `gpt-5.5` | OpenAI Responses | |
+| GPT-5.4 mini | `gpt-5.4-mini` | OpenAI Responses | |
+| GPT-5.5 Pro | `gpt-5.5-pro` | OpenAI Responses | |
+| GLM-5.2 | `z-ai/glm-5.2` | OpenRouter | Parasail |
+| Kimi K2.6 | `moonshotai/kimi-k2.6` | OpenRouter | Moonshot AI |
+| Gemma 4 Free | `google/gemma-4-26b-a4b-it:free` | OpenRouter | |
 
 Web search is controlled by two settings. `Web Search` is enabled by default.
 When `Use Exa` is disabled, OpenAI uses the Responses API `web_search` tool and
