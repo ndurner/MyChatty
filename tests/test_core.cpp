@@ -24,9 +24,16 @@ private slots:
         QCOMPARE(glm.apiModel, QString("z-ai/glm-5.2"));
         QCOMPARE(glm.provider, ApiProvider::OpenRouterChat);
         QCOMPARE(glm.providerOnly, QStringList{"Parasail"});
+        QVERIFY(!glm.supportsImages);
+        const ModelInfo kimi = ModelCatalog::modelForDisplayName("Kimi K2.6");
+        QCOMPARE(kimi.apiModel, QString("moonshotai/kimi-k2.6"));
+        QCOMPARE(kimi.provider, ApiProvider::OpenRouterChat);
+        QCOMPARE(kimi.providerOnly, QStringList{"Moonshot AI"});
+        QVERIFY(kimi.supportsImages);
         const ModelInfo gemma = ModelCatalog::modelForDisplayName("Gemma 4 Free");
         QCOMPARE(gemma.apiModel, QString("google/gemma-4-26b-a4b-it:free"));
         QCOMPARE(gemma.provider, ApiProvider::OpenRouterChat);
+        QVERIFY(gemma.supportsImages);
     }
 
     void openRouterPayloadPinsParasailForGlm()

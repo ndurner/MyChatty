@@ -15,6 +15,7 @@ void OpenaiChatAPI::send(const ChatRequest &request)
 {
     m_done = false;
     m_result = {};
+    m_responseBody.clear();
 
     QNetworkRequest networkRequest = jsonRequest(QUrl("https://openrouter.ai/api/v1/chat/completions"), request.apiKey);
     networkRequest.setRawHeader("HTTP-Referer", "https://github.com/ndurner/MyChatty");
@@ -27,7 +28,12 @@ void OpenaiChatAPI::send(const ChatRequest &request)
         if (!m_reply) {
             return;
         }
-        m_parser.feed(m_reply->readAll());
+        const QByteArray chunk = m_reply->readAll();
+        m_responseBody.append(chunk);
+        if (m_responseBody.size() > 4096) {
+            m_responseBody.truncate(4096);
+        }
+        m_parser.feed(chunk);
     });
     connect(m_reply, &QNetworkReply::finished, this, &OpenaiChatAPI::finishFromReply);
 }
@@ -85,12 +91,16 @@ void OpenaiChatAPI::finishFromReply()
     m_parser.finish();
     const QByteArray rest = m_reply->readAll();
     if (!rest.isEmpty()) {
+        m_responseBody.append(rest);
+        if (m_responseBody.size() > 4096) {
+            m_responseBody.truncate(4096);
+        }
         m_parser.feed(rest);
         m_parser.finish();
     }
 
     if (m_reply->error() != QNetworkReply::NoError && !m_done) {
-        emit failed(networkErrorText(m_reply, rest));
+        emit failed(networkErrorText(m_reply, m_responseBody));
         m_reply->deleteLater();
         return;
     }

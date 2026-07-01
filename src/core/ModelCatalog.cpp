@@ -8,7 +8,8 @@ QList<ModelInfo> ModelCatalog::models()
         {"5.5", "GPT-5.5", "gpt-5.5", ApiProvider::OpenAIResponses, "OpenAI", {}},
         {"5.4-mini", "GPT-5.4 mini", "gpt-5.4-mini", ApiProvider::OpenAIResponses, "OpenAI", {}},
         {"5.5 Pro", "GPT-5.5 Pro", "gpt-5.5-pro", ApiProvider::OpenAIResponses, "OpenAI", {}},
-        {"GLM-5.2", "GLM-5.2", "z-ai/glm-5.2", ApiProvider::OpenRouterChat, "OpenRouter", {"Parasail"}},
+        {"GLM-5.2", "GLM-5.2", "z-ai/glm-5.2", ApiProvider::OpenRouterChat, "OpenRouter", {"Parasail"}, false},
+        {"Kimi K2.6", "Kimi K2.6", "moonshotai/kimi-k2.6", ApiProvider::OpenRouterChat, "OpenRouter", {"Moonshot AI"}},
         {"Gemma 4 Free", "Gemma 4 Free", "google/gemma-4-26b-a4b-it:free", ApiProvider::OpenRouterChat, "OpenRouter", {}},
     };
 }
@@ -50,6 +51,7 @@ QVariantList ModelCatalog::modelOptions()
         row["menuTitle"] = model.menuTitle;
         row["apiModel"] = model.apiModel;
         row["provider"] = model.providerLabel;
+        row["supportsImages"] = model.supportsImages;
         result.append(row);
     }
     return result;

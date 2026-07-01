@@ -44,6 +44,18 @@ static QString titleFromReasoning(const QString &reasoning)
     return {};
 }
 
+static bool hasImageAttachments(const QList<ChatMessage> &messages)
+{
+    for (const ChatMessage &message : messages) {
+        for (const Attachment &attachment : message.attachments) {
+            if (attachment.isImage()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 ChatController::ChatController(SettingsStore *settings, QObject *parent)
     : QObject(parent)
     , m_settings(settings)
@@ -171,6 +183,15 @@ void ChatController::sendMessage(const QString &text)
     assistant.streaming = true;
     m_messages.append(assistant);
     const int assistantRow = m_messages.rowCount() - 1;
+
+    if (hasImageAttachments(request.history) && !request.model.supportsImages) {
+        assistant.text = QStringLiteral("%1 does not support image input. Choose Gemma 4 Free or Kimi K2.6 for image analysis.")
+                             .arg(request.model.displayName);
+        assistant.streaming = false;
+        m_messages.update(assistantRow, assistant);
+        persistCurrentConversation();
+        return;
+    }
 
     if (request.apiKey.trimmed().isEmpty()) {
         assistant.text = QStringLiteral("Missing %1 API key. Add it in Settings.")

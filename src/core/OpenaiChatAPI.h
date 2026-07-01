@@ -19,6 +19,7 @@ private:
 
     SseParser m_parser;
     ChatResult m_result;
+    QByteArray m_responseBody;
     bool m_done = false;
 };
 

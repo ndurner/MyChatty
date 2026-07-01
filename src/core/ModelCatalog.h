@@ -18,6 +18,7 @@ struct ModelInfo {
     ApiProvider provider = ApiProvider::OpenAIResponses;
     QString providerLabel;
     QStringList providerOnly;
+    bool supportsImages = true;
 };
 
 class ModelCatalog {
