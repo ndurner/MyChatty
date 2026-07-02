@@ -29,7 +29,7 @@ Popup {
 
         AttachmentMenuRow {
             label: "Camera"
-            iconText: "▣"
+            iconName: "camera"
             onClicked: {
                 root.close()
                 root.chooserRequested("camera")
@@ -37,7 +37,7 @@ Popup {
         }
         AttachmentMenuRow {
             label: "Photos"
-            iconText: "▧"
+            iconName: "photos"
             onClicked: {
                 root.close()
                 root.chooserRequested("photos")
@@ -45,7 +45,7 @@ Popup {
         }
         AttachmentMenuRow {
             label: "Files"
-            iconText: "⌇"
+            iconName: "files"
             onClicked: {
                 root.close()
                 root.chooserRequested("files")
@@ -53,7 +53,7 @@ Popup {
         }
         AttachmentMenuRow {
             label: "Plugins"
-            iconText: "⌘"
+            iconName: "plugins"
             onClicked: {
                 root.close()
                 controller.notifyNotImplemented("Plugins")

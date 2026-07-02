@@ -60,6 +60,7 @@ qt_add_qml_module(MyChatty
     QML_FILES
         src/app/qml/Main.qml
         src/app/qml/AttachmentMenu.qml
+        src/app/qml/AttachmentMenuIcon.qml
         src/app/qml/AttachmentMenuRow.qml
         src/app/qml/ChatBubble.qml
         src/app/qml/Composer.qml
