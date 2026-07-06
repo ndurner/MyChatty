@@ -7,7 +7,6 @@
 #include "SpeechService.h"
 
 #include <QObject>
-#include <QElapsedTimer>
 #include <QTimer>
 #include <QVariantList>
 #include <memory>
@@ -97,8 +96,6 @@ private:
     SpeechService m_speech;
 
     QTimer m_streamFlushTimer;
-    QElapsedTimer m_streamTraceTimer;
-    bool m_traceStream = false;
     int m_streamAssistantRow = -1;
     QString m_pendingTextDelta;
     QString m_pendingReasoningDelta;
@@ -106,6 +103,7 @@ private:
     bool m_hasPendingCompletion = false;
     ChatResult m_pendingCompletionResult;
     ApiProvider m_pendingCompletionProvider = ApiProvider::OpenRouterChat;
+    bool m_pendingCompletionWebSearchEnabled = false;
     int m_pendingCompletionToolDepth = 0;
 };
 

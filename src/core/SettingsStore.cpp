@@ -147,7 +147,7 @@ void SettingsStore::reload()
         m_openRouterPdfEngine = QStringLiteral("cloudflare-ai");
     }
     m_customInstructions = settings.value("customInstructions").toString();
-    m_webSearchEnabled = settings.value("webSearchEnabled", false).toBool();
+    m_webSearchEnabled = settings.value("webSearchEnabled", true).toBool();
     m_exaSearchEnabled = settings.value("exaSearchEnabled", false).toBool();
     m_javaScriptUseEnabled = settings.value("javaScriptUseEnabled", false).toBool();
     emit openAIKeyChanged();
