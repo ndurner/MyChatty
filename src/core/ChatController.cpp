@@ -7,6 +7,7 @@
 #include "ToolExecutor.h"
 
 #include <QClipboard>
+#include <QDebug>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -63,6 +64,48 @@ static QJsonObject parseJsonObject(const QString &text)
 {
     const QJsonDocument doc = QJsonDocument::fromJson(text.toUtf8());
     return doc.isObject() ? doc.object() : QJsonObject{};
+}
+
+static bool shouldOfferWebSearch(const QList<ChatMessage> &messages)
+{
+    QString prompt;
+    for (auto it = messages.crbegin(); it != messages.crend(); ++it) {
+        if (it->isUser()) {
+            prompt = it->text.toLower();
+            break;
+        }
+    }
+    if (prompt.isEmpty()) {
+        return false;
+    }
+
+    const QStringList lookupPhrases = {
+        QStringLiteral("who is "),
+        QStringLiteral("where is "),
+        QStringLiteral("when is "),
+        QStringLiteral("latest"),
+        QStringLiteral("current"),
+        QStringLiteral("today"),
+        QStringLiteral("yesterday"),
+        QStringLiteral("tomorrow"),
+        QStringLiteral("news"),
+        QStringLiteral("price"),
+        QStringLiteral("schedule"),
+        QStringLiteral("weather"),
+        QStringLiteral("search"),
+        QStringLiteral("look up"),
+        QStringLiteral("lookup"),
+        QStringLiteral("web"),
+        QStringLiteral("online"),
+        QStringLiteral("cite"),
+        QStringLiteral("source"),
+    };
+    for (const QString &phrase : lookupPhrases) {
+        if (prompt.contains(phrase)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static QString takeChunk(QString &buffer, int maxCharacters)
@@ -229,7 +272,8 @@ ChatRequest ChatController::makeRequest() const
     request.apiKey = apiKeyForModel(request.model);
     request.exaApiKey = m_settings ? m_settings->exaKey() : QString();
     request.openRouterPdfEngine = m_settings ? m_settings->openRouterPdfEngine() : QStringLiteral("cloudflare-ai");
-    request.enableWebSearch = !m_settings || m_settings->webSearchEnabled();
+    request.enableWebSearch = (!m_settings || m_settings->webSearchEnabled())
+        && shouldOfferWebSearch(request.history);
     request.useExaSearch = m_settings && m_settings->exaSearchEnabled();
     request.enableJavaScriptUse = m_settings && m_settings->javaScriptUseEnabled();
     request.stream = true;
@@ -239,6 +283,14 @@ ChatRequest ChatController::makeRequest() const
 void ChatController::beginRequest(const ChatRequest &request, int assistantRow, int toolDepth)
 {
     resetStreamBuffer();
+    m_traceStream = qEnvironmentVariableIsSet("MYCHATTY_STREAM_TRACE");
+    if (m_traceStream) {
+        m_streamTraceTimer.start();
+        qInfo().noquote() << "stream-trace controller event=begin"
+                          << " row=" << assistantRow
+                          << " depth=" << toolDepth
+                          << " model=" << request.model.apiModel;
+    }
     setBusy(true);
     if (request.model.provider == ApiProvider::OpenRouterChat) {
         m_client = std::make_unique<OpenaiChatAPI>();
@@ -256,11 +308,10 @@ void ChatController::beginRequest(const ChatRequest &request, int assistantRow, 
         const QString type = event.value("type").toString("tool event");
         setToast(QStringLiteral("Tool event: %1").arg(type));
     });
-    connect(m_client.get(), &ApiClient::completed, this, [this, assistantRow, provider = request.model.provider, webSearchEnabled = request.enableWebSearch, toolDepth](const ChatResult &result) {
+    connect(m_client.get(), &ApiClient::completed, this, [this, assistantRow, provider = request.model.provider, toolDepth](const ChatResult &result) {
         m_hasPendingCompletion = true;
         m_pendingCompletionResult = result;
         m_pendingCompletionProvider = provider;
-        m_pendingCompletionWebSearchEnabled = webSearchEnabled;
         m_pendingCompletionToolDepth = toolDepth;
         m_streamAssistantRow = assistantRow;
         completePendingRequestIfReady();
@@ -294,6 +345,14 @@ void ChatController::queueTextDelta(int assistantRow, const QString &delta)
         m_streamAssistantRow = assistantRow;
     }
     m_pendingTextDelta += delta;
+    if (m_traceStream) {
+        qInfo().noquote() << "stream-trace controller event=queueText"
+                          << " t_ms=" << m_streamTraceTimer.elapsed()
+                          << " row=" << assistantRow
+                          << " chars=" << delta.size()
+                          << " pendingText=" << m_pendingTextDelta.size()
+                          << " pendingReasoning=" << m_pendingReasoningDelta.size();
+    }
     if (!m_streamFlushTimer.isActive()) {
         m_streamFlushTimer.start();
     }
@@ -309,6 +368,14 @@ void ChatController::queueReasoningDelta(int assistantRow, const QString &delta)
         m_streamAssistantRow = assistantRow;
     }
     m_pendingReasoningDelta += delta;
+    if (m_traceStream) {
+        qInfo().noquote() << "stream-trace controller event=queueReasoning"
+                          << " t_ms=" << m_streamTraceTimer.elapsed()
+                          << " row=" << assistantRow
+                          << " chars=" << delta.size()
+                          << " pendingText=" << m_pendingTextDelta.size()
+                          << " pendingReasoning=" << m_pendingReasoningDelta.size();
+    }
     if (!m_streamFlushTimer.isActive()) {
         m_streamFlushTimer.start();
     }
@@ -342,6 +409,15 @@ void ChatController::flushStreamDeltas()
 
     if (changed) {
         m_messages.update(m_streamAssistantRow, *message);
+        if (m_traceStream) {
+            qInfo().noquote() << "stream-trace controller event=flush"
+                              << " t_ms=" << m_streamTraceTimer.elapsed()
+                              << " row=" << m_streamAssistantRow
+                              << " textChars=" << text.size()
+                              << " reasoningChars=" << reasoning.size()
+                              << " remainingText=" << m_pendingTextDelta.size()
+                              << " remainingReasoning=" << m_pendingReasoningDelta.size();
+        }
     }
 
     if (m_pendingReasoningDelta.isEmpty() && m_pendingTextDelta.isEmpty()) {
@@ -355,19 +431,23 @@ void ChatController::completePendingRequestIfReady()
     if (!m_hasPendingCompletion || !m_pendingTextDelta.isEmpty() || !m_pendingReasoningDelta.isEmpty()) {
         if (m_hasPendingCompletion && !m_streamFlushTimer.isActive()) {
             m_streamFlushTimer.start();
+            if (m_traceStream) {
+                qInfo().noquote() << "stream-trace controller event=completionWaitingForFlush"
+                                  << " t_ms=" << m_streamTraceTimer.elapsed()
+                                  << " pendingText=" << m_pendingTextDelta.size()
+                                  << " pendingReasoning=" << m_pendingReasoningDelta.size();
+            }
         }
         return;
     }
 
     const ChatResult result = m_pendingCompletionResult;
     const ApiProvider provider = m_pendingCompletionProvider;
-    const bool webSearchEnabled = m_pendingCompletionWebSearchEnabled;
     const int toolDepth = m_pendingCompletionToolDepth;
     const int assistantRow = m_streamAssistantRow;
 
     m_hasPendingCompletion = false;
     m_pendingCompletionResult = {};
-    m_pendingCompletionWebSearchEnabled = false;
     m_pendingCompletionToolDepth = 0;
 
     ChatMessage *message = assistantMessageAt(assistantRow);
@@ -379,15 +459,17 @@ void ChatController::completePendingRequestIfReady()
             message->reasoning = result.reasoning;
         }
         message->rawOutputItems = result.rawOutputItems;
-        if (provider == ApiProvider::OpenRouterChat && webSearchEnabled) {
-            message->toolIndicators = QJsonArray{QJsonObject{
-                {"type", "server_tool_call"},
-                {"name", "openrouter:web_search"},
-            }};
-        }
         message->rawResponse = result.rawResponse;
         message->streaming = false;
         m_messages.update(assistantRow, *message);
+        if (m_traceStream) {
+            qInfo().noquote() << "stream-trace controller event=completeUi"
+                              << " t_ms=" << m_streamTraceTimer.elapsed()
+                              << " row=" << assistantRow
+                              << " textChars=" << message->text.size()
+                              << " reasoningChars=" << message->reasoning.size()
+                              << " rawItems=" << message->rawOutputItems.size();
+        }
     }
 
     QObject *finishedClient = m_client.release();
@@ -395,6 +477,10 @@ void ChatController::completePendingRequestIfReady()
         finishedClient->deleteLater();
     }
     if (continueAfterToolCalls(result, provider, toolDepth)) {
+        if (m_traceStream) {
+            qInfo().noquote() << "stream-trace controller event=continueAfterToolCalls"
+                              << " t_ms=" << m_streamTraceTimer.elapsed();
+        }
         return;
     }
     m_streamAssistantRow = -1;

@@ -1,5 +1,6 @@
 #include "OpenaiChatAPI.h"
 
+#include <QDebug>
 #include <QJsonDocument>
 #include <QNetworkReply>
 
@@ -18,6 +19,17 @@ void OpenaiChatAPI::send(const ChatRequest &request)
     m_responseBody.clear();
     m_reasoningDetails = {};
     m_toolCalls.clear();
+    m_traceStream = qEnvironmentVariableIsSet("MYCHATTY_STREAM_TRACE");
+    m_traceReadyReadCount = 0;
+    m_traceReasoningCount = 0;
+    m_traceTextCount = 0;
+    m_traceToolCount = 0;
+    if (m_traceStream) {
+        m_traceTimer.start();
+        qInfo().noquote() << "stream-trace api=OpenRouterChat event=send model=" << request.model.apiModel
+                          << " webSearch=" << request.enableWebSearch
+                          << " codeInterpreter=" << request.enableJavaScriptUse;
+    }
 
     QNetworkRequest networkRequest = jsonRequest(QUrl("https://openrouter.ai/api/v1/chat/completions"), request.apiKey);
     networkRequest.setRawHeader("HTTP-Referer", "https://github.com/ndurner/MyChatty");
@@ -31,6 +43,13 @@ void OpenaiChatAPI::send(const ChatRequest &request)
             return;
         }
         const QByteArray chunk = m_reply->readAll();
+        if (m_traceStream) {
+            ++m_traceReadyReadCount;
+            qInfo().noquote() << "stream-trace api=OpenRouterChat event=readyRead"
+                              << " t_ms=" << m_traceTimer.elapsed()
+                              << " chunk=" << m_traceReadyReadCount
+                              << " bytes=" << chunk.size();
+        }
         m_responseBody.append(chunk);
         if (m_responseBody.size() > 4096) {
             m_responseBody.truncate(4096);
@@ -43,6 +62,10 @@ void OpenaiChatAPI::send(const ChatRequest &request)
 void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
 {
     if (data.trimmed() == "[DONE]") {
+        if (m_traceStream) {
+            qInfo().noquote() << "stream-trace api=OpenRouterChat event=done"
+                              << " t_ms=" << m_traceTimer.elapsed();
+        }
         completeIfNeeded();
         return;
     }
@@ -76,11 +99,27 @@ void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
         const QString content = delta.value("content").toString();
         if (!content.isEmpty()) {
             m_result.text += content;
+            if (m_traceStream) {
+                ++m_traceTextCount;
+                qInfo().noquote() << "stream-trace api=OpenRouterChat event=textDelta"
+                                  << " t_ms=" << m_traceTimer.elapsed()
+                                  << " count=" << m_traceTextCount
+                                  << " chars=" << content.size()
+                                  << " totalChars=" << m_result.text.size();
+            }
             emit textDelta(content);
         }
         const QString reasoning = delta.value("reasoning").toString();
         if (!reasoning.isEmpty()) {
             m_result.reasoning += reasoning;
+            if (m_traceStream) {
+                ++m_traceReasoningCount;
+                qInfo().noquote() << "stream-trace api=OpenRouterChat event=reasoningDelta"
+                                  << " t_ms=" << m_traceTimer.elapsed()
+                                  << " count=" << m_traceReasoningCount
+                                  << " chars=" << reasoning.size()
+                                  << " totalChars=" << m_result.reasoning.size();
+            }
             emit reasoningDelta(reasoning);
         }
         if (delta.contains("reasoning_details")) {
@@ -90,6 +129,12 @@ void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
             }
         }
         if (delta.contains("tool_calls")) {
+            if (m_traceStream) {
+                ++m_traceToolCount;
+                qInfo().noquote() << "stream-trace api=OpenRouterChat event=toolDelta"
+                                  << " t_ms=" << m_traceTimer.elapsed()
+                                  << " count=" << m_traceToolCount;
+            }
             const QJsonArray calls = delta.value("tool_calls").toArray();
             for (const QJsonValue &callValue : calls) {
                 const QJsonObject deltaCall = callValue.toObject();
@@ -133,6 +178,11 @@ void OpenaiChatAPI::finishFromReply()
     }
 
     if (m_reply->error() != QNetworkReply::NoError && !m_done) {
+        if (m_traceStream) {
+            qInfo().noquote() << "stream-trace api=OpenRouterChat event=networkError"
+                              << " t_ms=" << m_traceTimer.elapsed()
+                              << " error=" << m_reply->errorString();
+        }
         emit failed(networkErrorText(m_reply, m_responseBody));
         m_reply->deleteLater();
         return;
@@ -164,6 +214,13 @@ void OpenaiChatAPI::completeIfNeeded()
             assistant["reasoning"] = m_result.reasoning;
         }
         m_result.rawOutputItems.append(assistant);
+    }
+    if (m_traceStream) {
+        qInfo().noquote() << "stream-trace api=OpenRouterChat event=complete"
+                          << " t_ms=" << m_traceTimer.elapsed()
+                          << " textDeltas=" << m_traceTextCount
+                          << " reasoningDeltas=" << m_traceReasoningCount
+                          << " toolDeltas=" << m_traceToolCount;
     }
     m_done = true;
     emit completed(m_result);

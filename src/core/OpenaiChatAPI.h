@@ -5,6 +5,7 @@
 
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QElapsedTimer>
 #include <QMap>
 
 namespace MyChatty {
@@ -26,6 +27,12 @@ private:
     QByteArray m_responseBody;
     QJsonArray m_reasoningDetails;
     QMap<int, QJsonObject> m_toolCalls;
+    QElapsedTimer m_traceTimer;
+    bool m_traceStream = false;
+    int m_traceReadyReadCount = 0;
+    int m_traceReasoningCount = 0;
+    int m_traceTextCount = 0;
+    int m_traceToolCount = 0;
     bool m_done = false;
 };
 
