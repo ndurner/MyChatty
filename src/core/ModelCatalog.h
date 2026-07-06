@@ -19,6 +19,7 @@ struct ModelInfo {
     QString providerLabel;
     QStringList providerOnly;
     bool supportsImages = true;
+    bool supportsFiles = false;
 };
 
 class ModelCatalog {

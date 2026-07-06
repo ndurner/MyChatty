@@ -40,6 +40,7 @@ struct ChatMessage {
     QDateTime createdAt;
     QString reasoning;
     QJsonArray rawOutputItems;
+    QJsonArray toolIndicators;
     QJsonObject rawResponse;
     bool streaming = false;
 
@@ -54,8 +55,10 @@ struct ChatRequest {
     QString customInstructions;
     QString apiKey;
     QString exaApiKey;
+    QString openRouterPdfEngine = QStringLiteral("cloudflare-ai");
     bool enableWebSearch = false;
     bool useExaSearch = false;
+    bool enableJavaScriptUse = false;
     int maxOutputTokens = 0;
     bool stream = true;
 };

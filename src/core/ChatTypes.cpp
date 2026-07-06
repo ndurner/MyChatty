@@ -81,6 +81,12 @@ bool Attachment::isTextLike() const
         || fileName.endsWith(".csv", Qt::CaseInsensitive);
 }
 
+static bool isPdfAttachment(const Attachment &attachment)
+{
+    return attachment.mimeType == QStringLiteral("application/pdf")
+        || attachment.fileName.endsWith(".pdf", Qt::CaseInsensitive);
+}
+
 QByteArray Attachment::readBytes(qint64 limit) const
 {
     if (localPath.isEmpty()) {
@@ -138,6 +144,18 @@ static QJsonArray attachmentsForResponses(const QList<Attachment> &attachments)
 {
     QJsonArray parts;
     for (const Attachment &attachment : attachments) {
+        if (isPdfAttachment(attachment)) {
+            const QString data = attachment.dataUrl();
+            if (!data.isEmpty()) {
+                parts.append(QJsonObject{
+                    {"type", "input_file"},
+                    {"filename", attachment.fileName},
+                    {"file_data", data},
+                });
+            }
+            continue;
+        }
+
         if (attachment.isImage()) {
             const QString data = attachment.dataUrl();
             if (!data.isEmpty()) {
@@ -189,6 +207,20 @@ static QJsonArray attachmentsForChat(const QList<Attachment> &attachments)
 {
     QJsonArray parts;
     for (const Attachment &attachment : attachments) {
+        if (isPdfAttachment(attachment)) {
+            const QString data = attachment.dataUrl();
+            if (!data.isEmpty()) {
+                parts.append(QJsonObject{
+                    {"type", "file"},
+                    {"file", QJsonObject{
+                        {"filename", attachment.fileName},
+                        {"file_data", data},
+                    }},
+                });
+            }
+            continue;
+        }
+
         if (attachment.isImage()) {
             const QString data = attachment.dataUrl();
             if (!data.isEmpty()) {
@@ -235,6 +267,70 @@ static QJsonValue contentForChatUser(const ChatMessage &message)
         content.append(part);
     }
     return content;
+}
+
+static bool hasPdfAttachments(const QList<ChatMessage> &messages)
+{
+    for (const ChatMessage &message : messages) {
+        for (const Attachment &attachment : message.attachments) {
+            if (isPdfAttachment(attachment)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static void appendTool(QJsonObject &body, const QJsonObject &tool)
+{
+    QJsonArray tools = body.value("tools").toArray();
+    tools.append(tool);
+    body["tools"] = tools;
+}
+
+static QJsonObject evalJavaScriptTool()
+{
+    return QJsonObject{
+        {"type", "function"},
+        {"name", "eval_javascript"},
+        {"description", "Evaluate short JavaScript code in the configured Qt QJSEngine sandbox. Use this for arithmetic, dates, JSON, small tables, and deterministic calculations. Use print(...) for the final result. A scoped fs object exposes only this conversation's virtual files."},
+        {"parameters", QJsonObject{
+            {"type", "object"},
+            {"properties", QJsonObject{
+                {"javascript_source_code", QJsonObject{
+                    {"type", "string"},
+                    {"description", "JavaScript source code to execute. Keep it short and print the answer."},
+                }},
+            }},
+            {"required", QJsonArray{"javascript_source_code"}},
+            {"additionalProperties", false},
+        }},
+    };
+}
+
+static QJsonObject openRouterWebSearchTool(bool preferExa)
+{
+    QJsonObject tool{{"type", "openrouter:web_search"}};
+    if (preferExa) {
+        tool["parameters"] = QJsonObject{
+            {"engine", "exa"},
+            {"search_context_size", "medium"},
+        };
+    }
+    return tool;
+}
+
+static QJsonObject chatFunctionTool(const QJsonObject &responsesTool)
+{
+    QJsonObject function = responsesTool;
+    function.remove("type");
+    QJsonObject parameters = function.value("parameters").toObject();
+    parameters.remove("additionalProperties");
+    function["parameters"] = parameters;
+    return QJsonObject{
+        {"type", "function"},
+        {"function", function},
+    };
 }
 
 QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
@@ -284,20 +380,23 @@ QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
     }
     if (request.enableWebSearch) {
         if (request.useExaSearch) {
-            body["tools"] = QJsonArray{QJsonObject{
+            appendTool(body, QJsonObject{
                 {"type", "mcp"},
                 {"server_label", "exa"},
                 {"server_description", "Exa web search and webpage fetch tools."},
                 {"server_url", exaMcpServerUrl(request.exaApiKey)},
                 {"require_approval", "never"},
-            }};
+            });
         } else {
-            body["tools"] = QJsonArray{QJsonObject{
+            appendTool(body, QJsonObject{
                 {"type", "web_search"},
                 {"search_context_size", "medium"},
-            }};
+            });
             body["include"] = QJsonArray{"reasoning.encrypted_content", "web_search_call.action.sources"};
         }
+    }
+    if (request.enableJavaScriptUse) {
+        appendTool(body, evalJavaScriptTool());
     }
     return body;
 }
@@ -305,10 +404,17 @@ QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
 QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
 {
     QJsonArray messages;
-    if (!request.customInstructions.trimmed().isEmpty()) {
+    QString systemInstructions = request.customInstructions.trimmed();
+    if (request.enableWebSearch) {
+        const QString webInstruction = QStringLiteral("Web search is available through the openrouter:web_search server tool. Use it for current facts, public people, organizations, news, prices, schedules, and other information that may be outside the model's training data.");
+        systemInstructions = systemInstructions.isEmpty()
+            ? webInstruction
+            : systemInstructions + QStringLiteral("\n") + webInstruction;
+    }
+    if (!systemInstructions.isEmpty()) {
         messages.append(QJsonObject{
             {"role", "system"},
-            {"content", request.customInstructions.trimmed()},
+            {"content", systemInstructions},
         });
     }
 
@@ -318,6 +424,10 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
                 {"role", "user"},
                 {"content", contentForChatUser(message)},
             });
+        } else if (!message.rawOutputItems.isEmpty()) {
+            for (const auto &item : message.rawOutputItems) {
+                messages.append(item);
+            }
         } else if (message.isAssistant() && !message.text.isEmpty()) {
             messages.append(QJsonObject{
                 {"role", "assistant"},
@@ -330,20 +440,34 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
         {"model", request.model.apiModel},
         {"messages", messages},
         {"stream", request.stream},
-        {"reasoning_effort", ModelCatalog::openRouterReasoningEffort(request.effort)},
+        {"reasoning", QJsonObject{
+            {"effort", ModelCatalog::openRouterReasoningEffort(request.effort)},
+            {"exclude", false},
+        }},
     };
     if (request.maxOutputTokens > 0) {
         body["max_tokens"] = request.maxOutputTokens;
     }
     if (request.enableWebSearch) {
-        QJsonObject webPlugin{{"id", "web"}};
-        if (request.useExaSearch) {
-            webPlugin["engine"] = "exa";
-        }
-        body["plugins"] = QJsonArray{webPlugin};
-        body["web_search_options"] = QJsonObject{
-            {"search_context_size", "medium"},
-        };
+        QJsonArray tools = body.value("tools").toArray();
+        tools.append(openRouterWebSearchTool(request.useExaSearch));
+        body["tools"] = tools;
+    }
+    if (hasPdfAttachments(request.history)) {
+        QJsonArray plugins = body.value("plugins").toArray();
+        const QString engine = request.openRouterPdfEngine == QStringLiteral("native")
+            ? QStringLiteral("native")
+            : QStringLiteral("cloudflare-ai");
+        plugins.append(QJsonObject{
+            {"id", "file-parser"},
+            {"pdf", QJsonObject{{"engine", engine}}},
+        });
+        body["plugins"] = plugins;
+    }
+    if (request.enableJavaScriptUse) {
+        QJsonArray tools = body.value("tools").toArray();
+        tools.append(chatFunctionTool(evalJavaScriptTool()));
+        body["tools"] = tools;
     }
     if (!request.model.providerOnly.isEmpty()) {
         QJsonArray providers;

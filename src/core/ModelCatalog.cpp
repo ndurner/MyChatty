@@ -5,12 +5,16 @@ namespace MyChatty {
 QList<ModelInfo> ModelCatalog::models()
 {
     return {
-        {"5.5", "GPT-5.5", "gpt-5.5", ApiProvider::OpenAIResponses, "OpenAI", {}},
-        {"5.4-mini", "GPT-5.4 mini", "gpt-5.4-mini", ApiProvider::OpenAIResponses, "OpenAI", {}},
-        {"5.5 Pro", "GPT-5.5 Pro", "gpt-5.5-pro", ApiProvider::OpenAIResponses, "OpenAI", {}},
-        {"GLM-5.2", "GLM-5.2", "z-ai/glm-5.2", ApiProvider::OpenRouterChat, "OpenRouter", {"Parasail"}, false},
-        {"Kimi K2.6", "Kimi K2.6", "moonshotai/kimi-k2.6", ApiProvider::OpenRouterChat, "OpenRouter", {"Moonshot AI"}},
-        {"Gemma 4 Free", "Gemma 4 Free", "google/gemma-4-26b-a4b-it:free", ApiProvider::OpenRouterChat, "OpenRouter", {}},
+        {"5.5", "GPT-5.5", "gpt-5.5", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
+        {"5.4-mini", "GPT-5.4 mini", "gpt-5.4-mini", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
+        {"5.5 Pro", "GPT-5.5 Pro", "gpt-5.5-pro", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
+        {"GLM-5.2", "GLM-5.2", "z-ai/glm-5.2", ApiProvider::OpenRouterChat, "OpenRouter", {"Parasail"}, false, false},
+        {"Kimi K2.6", "Kimi K2.6", "moonshotai/kimi-k2.6", ApiProvider::OpenRouterChat, "OpenRouter", {"Moonshot AI"}, true, false},
+        {"Gemini 3.5 Flash", "Gemini 3.5 Flash", "google/gemini-3.5-flash", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
+        {"Gemini Flash Lite", "Gemini Flash Lite", "google/gemini-3.1-flash-lite", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
+        {"Gemini Pro Latest", "Gemini Pro Latest", "~google/gemini-pro-latest", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
+        {"GPT OSS 20B", "GPT OSS 20B", "openai/gpt-oss-20b", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, false},
+        {"Gemma 4 Free", "Gemma 4 Free", "google/gemma-4-26b-a4b-it:free", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, false},
     };
 }
 
@@ -39,6 +43,7 @@ ModelInfo ModelCatalog::modelForApiName(const QString &apiName)
     custom.apiModel = apiName;
     custom.provider = apiName.contains('/') ? ApiProvider::OpenRouterChat : ApiProvider::OpenAIResponses;
     custom.providerLabel = providerName(custom.provider);
+    custom.supportsFiles = custom.provider == ApiProvider::OpenAIResponses;
     return custom;
 }
 
@@ -52,6 +57,7 @@ QVariantList ModelCatalog::modelOptions()
         row["apiModel"] = model.apiModel;
         row["provider"] = model.providerLabel;
         row["supportsImages"] = model.supportsImages;
+        row["supportsFiles"] = model.supportsFiles;
         result.append(row);
     }
     return result;

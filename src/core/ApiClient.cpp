@@ -33,7 +33,11 @@ QString ApiClient::networkErrorText(QNetworkReply *reply, const QByteArray &body
         const QJsonObject object = doc.object();
         const QJsonValue error = object.value("error");
         if (error.isObject()) {
-            message = error.toObject().value("message").toString();
+            const QJsonObject errorObject = error.toObject();
+            message = errorObject.value("metadata").toObject().value("raw").toString();
+            if (message.isEmpty()) {
+                message = errorObject.value("message").toString();
+            }
         } else if (error.isString()) {
             message = error.toString();
         }

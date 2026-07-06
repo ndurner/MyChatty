@@ -146,6 +146,43 @@ Popup {
                     }
 
                     Text {
+                        text: "Files"
+                        color: "#969696"
+                        font.pixelSize: 21
+                        font.weight: Font.Bold
+                        leftPadding: 18
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 88
+                        radius: 26
+                        color: "#ffffff"
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 22
+                            anchors.rightMargin: 18
+                            spacing: 14
+                            Text {
+                                width: parent.width - pdfEngine.width - 14
+                                height: parent.height
+                                text: "OpenRouter PDF"
+                                color: "#111111"
+                                font.pixelSize: 22
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                            }
+                            ComboBox {
+                                id: pdfEngine
+                                width: 158
+                                anchors.verticalCenter: parent.verticalCenter
+                                model: ["cloudflare-ai", "native"]
+                                currentIndex: store.openRouterPdfEngine === "native" ? 1 : 0
+                                onActivated: store.openRouterPdfEngine = currentText
+                            }
+                        }
+                    }
+
+                    Text {
                         text: "Search"
                         color: "#969696"
                         font.pixelSize: 21

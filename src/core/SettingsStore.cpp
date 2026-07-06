@@ -25,6 +25,11 @@ QString SettingsStore::exaKey() const
     return m_exaKey;
 }
 
+QString SettingsStore::openRouterPdfEngine() const
+{
+    return m_openRouterPdfEngine;
+}
+
 QString SettingsStore::customInstructions() const
 {
     return m_customInstructions;
@@ -38,6 +43,11 @@ bool SettingsStore::webSearchEnabled() const
 bool SettingsStore::exaSearchEnabled() const
 {
     return m_exaSearchEnabled;
+}
+
+bool SettingsStore::javaScriptUseEnabled() const
+{
+    return m_javaScriptUseEnabled;
 }
 
 void SettingsStore::setOpenAIKey(const QString &value)
@@ -67,6 +77,16 @@ void SettingsStore::setExaKey(const QString &value)
     emit exaKeyChanged();
 }
 
+void SettingsStore::setOpenRouterPdfEngine(const QString &value)
+{
+    const QString normalized = value == QStringLiteral("native") ? value : QStringLiteral("cloudflare-ai");
+    if (m_openRouterPdfEngine == normalized) {
+        return;
+    }
+    m_openRouterPdfEngine = normalized;
+    emit openRouterPdfEngineChanged();
+}
+
 void SettingsStore::setCustomInstructions(const QString &value)
 {
     if (m_customInstructions == value) {
@@ -94,15 +114,26 @@ void SettingsStore::setExaSearchEnabled(bool value)
     emit exaSearchEnabledChanged();
 }
 
+void SettingsStore::setJavaScriptUseEnabled(bool value)
+{
+    if (m_javaScriptUseEnabled == value) {
+        return;
+    }
+    m_javaScriptUseEnabled = value;
+    emit javaScriptUseEnabledChanged();
+}
+
 void SettingsStore::save()
 {
     QSettings settings;
     settings.setValue("openAIKey", m_openAIKey);
     settings.setValue("openRouterKey", m_openRouterKey);
     settings.setValue("exaKey", m_exaKey);
+    settings.setValue("openRouterPdfEngine", m_openRouterPdfEngine);
     settings.setValue("customInstructions", m_customInstructions);
     settings.setValue("webSearchEnabled", m_webSearchEnabled);
     settings.setValue("exaSearchEnabled", m_exaSearchEnabled);
+    settings.setValue("javaScriptUseEnabled", m_javaScriptUseEnabled);
 }
 
 void SettingsStore::reload()
@@ -111,15 +142,22 @@ void SettingsStore::reload()
     m_openAIKey = settings.value("openAIKey").toString();
     m_openRouterKey = settings.value("openRouterKey").toString();
     m_exaKey = settings.value("exaKey").toString();
+    m_openRouterPdfEngine = settings.value("openRouterPdfEngine", QStringLiteral("cloudflare-ai")).toString();
+    if (m_openRouterPdfEngine != QStringLiteral("native")) {
+        m_openRouterPdfEngine = QStringLiteral("cloudflare-ai");
+    }
     m_customInstructions = settings.value("customInstructions").toString();
     m_webSearchEnabled = settings.value("webSearchEnabled", true).toBool();
     m_exaSearchEnabled = settings.value("exaSearchEnabled", false).toBool();
+    m_javaScriptUseEnabled = settings.value("javaScriptUseEnabled", false).toBool();
     emit openAIKeyChanged();
     emit openRouterKeyChanged();
     emit exaKeyChanged();
+    emit openRouterPdfEngineChanged();
     emit customInstructionsChanged();
     emit webSearchEnabledChanged();
     emit exaSearchEnabledChanged();
+    emit javaScriptUseEnabledChanged();
 }
 
 } // namespace MyChatty
