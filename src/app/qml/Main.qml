@@ -144,6 +144,7 @@ ApplicationWindow {
         id: attachmentMenu
         parent: Overlay.overlay
         controller: chatController
+        store: settingsStore
         onChooserRequested: function(origin) {
             chooserOrigin = origin
             fileDialog.title = origin === "camera" ? "Choose from Camera Roll" :

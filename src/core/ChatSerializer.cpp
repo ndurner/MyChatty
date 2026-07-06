@@ -108,6 +108,7 @@ QJsonObject ChatSerializer::messageToStoreJson(const ChatMessage &message)
         {"reasoning", message.reasoning},
         {"attachments", attachments},
         {"rawOutputItems", message.rawOutputItems},
+        {"toolIndicators", message.toolIndicators},
         {"rawResponse", message.rawResponse},
     };
 }
@@ -124,6 +125,7 @@ ChatMessage ChatSerializer::messageFromStoreJson(const QJsonObject &object)
     }
     message.reasoning = object.value("reasoning").toString();
     message.rawOutputItems = object.value("rawOutputItems").toArray();
+    message.toolIndicators = object.value("toolIndicators").toArray();
     message.rawResponse = object.value("rawResponse").toObject();
 
     for (const auto &attachmentValue : object.value("attachments").toArray()) {

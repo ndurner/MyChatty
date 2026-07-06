@@ -3,6 +3,10 @@
 #include "ApiClient.h"
 #include "SseParser.h"
 
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QMap>
+
 namespace MyChatty {
 
 class OpenaiChatAPI : public ApiClient {
@@ -20,6 +24,8 @@ private:
     SseParser m_parser;
     ChatResult m_result;
     QByteArray m_responseBody;
+    QJsonArray m_reasoningDetails;
+    QMap<int, QJsonObject> m_toolCalls;
     bool m_done = false;
 };
 

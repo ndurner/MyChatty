@@ -12,6 +12,8 @@ Item {
     required property string reasoning
     required property var attachments
     required property bool streaming
+    required property var toolCalls
+    required property bool toolOnly
     property var controller
 
     function hasUsefulReasoning(value) {
@@ -20,7 +22,8 @@ Item {
     }
 
     width: ListView.view ? ListView.view.width : 400
-    implicitHeight: bubbleColumn.implicitHeight + 18
+    visible: !root.toolOnly
+    implicitHeight: root.toolOnly ? 0 : bubbleColumn.implicitHeight + 18
 
     Column {
         id: bubbleColumn
@@ -101,6 +104,7 @@ Item {
 
             TextEdit {
                 visible: root.hasUsefulReasoning(reasoning)
+                width: parent.width
                 text: reasoning.trim()
                 textFormat: TextEdit.PlainText
                 wrapMode: TextEdit.WordWrap
@@ -109,6 +113,137 @@ Item {
                 selectByKeyboard: true
                 color: "#9b9b9b"
                 font.pixelSize: 19
+            }
+
+            Column {
+                visible: root.toolCalls.length > 0
+                width: parent.width
+                spacing: 8
+                Repeater {
+                    model: root.toolCalls
+                    delegate: Rectangle {
+                        id: toolCard
+                        width: parent.width
+                        implicitHeight: toolHeader.height + (expanded ? detailWrap.implicitHeight + 10 : 0)
+                        height: implicitHeight
+                        radius: 8
+                        color: "#eef1f5"
+                        border.color: "#dce2ea"
+                        property bool expanded: false
+                        clip: true
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 0
+
+                            Button {
+                                id: toolHeader
+                                width: parent.width
+                                height: 42
+                                padding: 0
+                                onClicked: toolCard.expanded = !toolCard.expanded
+                                background: Rectangle {
+                                    color: toolHeader.down ? "#dde4ee" : "transparent"
+                                }
+                                contentItem: Row {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    spacing: 8
+                                    Text {
+                                        text: modelData.isOutput ? "✓" : "⚒"
+                                        color: "#627084"
+                                        font.pixelSize: 16
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                    Text {
+                                        width: parent.width - 44
+                                        text: modelData.isOutput ? modelData.label : "Used tool " + modelData.label + (modelData.hasOutput ? " · result" : "")
+                                        color: "#3d4756"
+                                        font.pixelSize: 15
+                                        font.weight: Font.DemiBold
+                                        elide: Text.ElideRight
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                    Text {
+                                        text: toolCard.expanded ? "▴" : "▾"
+                                        color: "#7b8795"
+                                        font.pixelSize: 16
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                id: detailWrap
+                                visible: toolCard.expanded
+                                width: parent.width - 14
+                                x: 7
+                                implicitHeight: toolDetailsColumn.implicitHeight + 18
+                                radius: 6
+                                color: "#dfe5ee"
+                                Column {
+                                    id: toolDetailsColumn
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    anchors.margins: 9
+                                    spacing: 10
+                                    Column {
+                                        visible: !modelData.isOutput
+                                        width: parent.width
+                                        spacing: 4
+                                        Text {
+                                            width: parent.width
+                                            text: modelData.label + " arguments"
+                                            color: "#526070"
+                                            font.pixelSize: 12
+                                            font.weight: Font.DemiBold
+                                            elide: Text.ElideRight
+                                        }
+                                        TextEdit {
+                                            width: parent.width
+                                            text: modelData.arguments
+                                            textFormat: TextEdit.PlainText
+                                            wrapMode: TextEdit.Wrap
+                                            readOnly: true
+                                            selectByMouse: true
+                                            selectByKeyboard: true
+                                            color: "#26313f"
+                                            font.family: "Menlo"
+                                            font.pixelSize: 12
+                                        }
+                                    }
+                                    Column {
+                                        visible: modelData.hasOutput || modelData.isOutput
+                                        width: parent.width
+                                        spacing: 4
+                                        Text {
+                                            width: parent.width
+                                            text: "Result"
+                                            color: "#526070"
+                                            font.pixelSize: 12
+                                            font.weight: Font.DemiBold
+                                            elide: Text.ElideRight
+                                        }
+                                        TextEdit {
+                                            width: parent.width
+                                            text: modelData.output
+                                            textFormat: TextEdit.PlainText
+                                            wrapMode: TextEdit.Wrap
+                                            readOnly: true
+                                            selectByMouse: true
+                                            selectByKeyboard: true
+                                            color: "#26313f"
+                                            font.family: "Menlo"
+                                            font.pixelSize: 12
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Column {

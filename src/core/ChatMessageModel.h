@@ -21,6 +21,8 @@ public:
         TimestampRole,
         StreamingRole,
         BlocksRole,
+        ToolCallsRole,
+        ToolOnlyRole,
     };
 
     explicit ChatMessageModel(QObject *parent = nullptr);

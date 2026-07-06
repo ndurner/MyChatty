@@ -1,15 +1,26 @@
+#include "ApiClient.h"
 #include "ChatSerializer.h"
 #include "ChatController.h"
 #include "ChatTypes.h"
 #include "MarkdownRenderer.h"
 #include "ModelCatalog.h"
 #include "SseParser.h"
+#include "ToolExecutor.h"
 
 #include <QJsonDocument>
+#include <QDir>
 #include <QSignalSpy>
 #include <QTest>
+#include <QTemporaryFile>
 
 using namespace MyChatty;
+
+class ApiClientProbe : public ApiClient {
+public:
+    using ApiClient::networkErrorText;
+
+    void send(const ChatRequest &) override {}
+};
 
 class CoreTests : public QObject {
     Q_OBJECT
@@ -34,6 +45,25 @@ private slots:
         QCOMPARE(gemma.apiModel, QString("google/gemma-4-26b-a4b-it:free"));
         QCOMPARE(gemma.provider, ApiProvider::OpenRouterChat);
         QVERIFY(gemma.supportsImages);
+        QVERIFY(!gemma.supportsFiles);
+
+        const ModelInfo flash = ModelCatalog::modelForDisplayName("Gemini 3.5 Flash");
+        QCOMPARE(flash.apiModel, QString("google/gemini-3.5-flash"));
+        QCOMPARE(flash.provider, ApiProvider::OpenRouterChat);
+        QVERIFY(flash.supportsFiles);
+
+        const ModelInfo flashLite = ModelCatalog::modelForDisplayName("Gemini Flash Lite");
+        QCOMPARE(flashLite.apiModel, QString("google/gemini-3.1-flash-lite"));
+        QVERIFY(flashLite.supportsFiles);
+
+        const ModelInfo geminiPro = ModelCatalog::modelForDisplayName("Gemini Pro Latest");
+        QCOMPARE(geminiPro.apiModel, QString("~google/gemini-pro-latest"));
+        QVERIFY(geminiPro.supportsFiles);
+
+        const ModelInfo gptOss = ModelCatalog::modelForDisplayName("GPT OSS 20B");
+        QCOMPARE(gptOss.apiModel, QString("openai/gpt-oss-20b"));
+        QCOMPARE(gptOss.provider, ApiProvider::OpenRouterChat);
+        QVERIFY(gptOss.providerOnly.isEmpty());
     }
 
     void openRouterPayloadPinsParasailForGlm()
@@ -136,16 +166,205 @@ private slots:
         request.enableWebSearch = true;
 
         QJsonObject payload = buildOpenaiChatPayload(request);
-        QJsonObject plugin = payload.value("plugins").toArray().first().toObject();
-        QCOMPARE(plugin.value("id").toString(), QString("web"));
-        QVERIFY(!plugin.contains("engine"));
-        QCOMPARE(payload.value("web_search_options").toObject().value("search_context_size").toString(), QString("medium"));
-        QVERIFY(!payload.contains("tools"));
+        QJsonObject tool = payload.value("tools").toArray().first().toObject();
+        QCOMPARE(tool.value("type").toString(), QString("openrouter:web_search"));
+        QVERIFY(!tool.contains("parameters"));
+        QVERIFY(!payload.contains("plugins"));
+        QVERIFY(!payload.contains("web_search_options"));
+        QCOMPARE(payload.value("messages").toArray().first().toObject().value("role").toString(), QString("system"));
+        QVERIFY(payload.value("messages").toArray().first().toObject().value("content").toString().contains("openrouter:web_search"));
 
         request.useExaSearch = true;
         payload = buildOpenaiChatPayload(request);
+        tool = payload.value("tools").toArray().first().toObject();
+        QCOMPARE(tool.value("parameters").toObject().value("engine").toString(), QString("exa"));
+        QCOMPARE(tool.value("parameters").toObject().value("search_context_size").toString(), QString("medium"));
+    }
+
+    void openRouterPayloadAddsPdfFileParser()
+    {
+        QTemporaryFile pdf(QDir::tempPath() + "/mychatty-pdf-XXXXXX.pdf");
+        QVERIFY(pdf.open());
+        pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n");
+        pdf.close();
+
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "summarize";
+        user.attachments = {Attachment::fromUrl(QUrl::fromLocalFile(pdf.fileName()), "files")};
+        ChatRequest request;
+        request.history = {user};
+        request.model = ModelCatalog::modelForDisplayName("Gemma 4 Free");
+        request.effort = "Medium";
+
+        QJsonObject payload = buildOpenaiChatPayload(request);
+        QJsonObject plugin = payload.value("plugins").toArray().first().toObject();
+        QCOMPARE(plugin.value("id").toString(), QString("file-parser"));
+        QCOMPARE(plugin.value("pdf").toObject().value("engine").toString(), QString("cloudflare-ai"));
+        QJsonArray content = payload.value("messages").toArray().first().toObject().value("content").toArray();
+        QCOMPARE(content.at(1).toObject().value("type").toString(), QString("file"));
+        QVERIFY(content.at(1).toObject().value("file").toObject().value("file_data").toString().startsWith("data:application/pdf;base64,"));
+
+        request.openRouterPdfEngine = "native";
+        payload = buildOpenaiChatPayload(request);
         plugin = payload.value("plugins").toArray().first().toObject();
-        QCOMPARE(plugin.value("engine").toString(), QString("exa"));
+        QCOMPARE(plugin.value("pdf").toObject().value("engine").toString(), QString("native"));
+    }
+
+    void payloadsAdvertiseJavaScriptTool()
+    {
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "2+2";
+        ChatRequest request;
+        request.history = {user};
+        request.model = ModelCatalog::modelForDisplayName("5.4-mini");
+        request.effort = "Medium";
+        request.enableJavaScriptUse = true;
+
+        QJsonObject payload = buildOpenaiResponsesPayload(request);
+        QJsonArray tools = payload.value("tools").toArray();
+        QCOMPARE(tools.size(), 1);
+        QCOMPARE(tools.at(0).toObject().value("name").toString(), QString("eval_javascript"));
+
+        request.model = ModelCatalog::modelForDisplayName("Gemini 3.5 Flash");
+        payload = buildOpenaiChatPayload(request);
+        tools = payload.value("tools").toArray();
+        QCOMPARE(tools.size(), 1);
+        const QJsonObject function = tools.at(0).toObject().value("function").toObject();
+        QCOMPARE(function.value("name").toString(), QString("eval_javascript"));
+        QVERIFY(!function.value("parameters").toObject().contains("additionalProperties"));
+        QCOMPARE(payload.value("reasoning").toObject().value("effort").toString(), QString("medium"));
+    }
+
+    void toolExecutorEvaluatesJavaScript()
+    {
+        ToolExecutor executor(nullptr, "test-js");
+        const QJsonObject result = executor.execute("eval_javascript", QJsonObject{
+            {"javascript_source_code", "const x = 2 ** 10; print(x + Math.sqrt(81));"},
+        });
+        QVERIFY(result.value("success").toBool());
+        QCOMPARE(result.value("prints").toString(), QString("1033\n"));
+    }
+
+    void toolExecutorProvidesScopedJavaScriptFs()
+    {
+        ToolExecutor executor(nullptr, "test-js-fs");
+        QJsonObject result = executor.execute("eval_javascript", QJsonObject{
+            {"javascript_source_code", "fs.writeText('/tmp/result.txt', 'hello fs'); print(fs.readText('/tmp/result.txt'));"},
+        });
+        QVERIFY(result.value("success").toBool());
+        QCOMPARE(result.value("prints").toString(), QString("hello fs\n"));
+
+        result = executor.execute("eval_javascript", QJsonObject{
+            {"javascript_source_code", "print(fs.readText('/../conversations.json') === '');"},
+        });
+        QVERIFY(result.value("success").toBool());
+        QCOMPARE(result.value("prints").toString(), QString("true\n"));
+    }
+
+    void openRouterPayloadReplaysToolMessages()
+    {
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "calculate";
+
+        ChatMessage assistant;
+        assistant.id = "a1";
+        assistant.role = "assistant";
+        assistant.rawOutputItems = QJsonArray{QJsonObject{
+            {"role", "assistant"},
+            {"content", ""},
+            {"reasoning_details", QJsonArray{QJsonObject{
+                {"type", "reasoning.encrypted"},
+                {"data", "opaque"},
+                {"format", "google-gemini-v1"},
+                {"index", 0},
+            }}},
+            {"tool_calls", QJsonArray{QJsonObject{
+                {"id", "call_1"},
+                {"type", "function"},
+                {"function", QJsonObject{{"name", "eval_javascript"}, {"arguments", "{\"javascript_source_code\":\"print(2+2)\"}"}}},
+            }}},
+        }};
+
+        ChatMessage tool;
+        tool.id = "t1";
+        tool.role = "assistant";
+        tool.rawOutputItems = QJsonArray{QJsonObject{
+            {"role", "tool"},
+            {"tool_call_id", "call_1"},
+            {"content", "{\"success\":true,\"prints\":\"4\\n\"}"},
+        }};
+
+        ChatRequest request;
+        request.history = {user, assistant, tool};
+        request.model = ModelCatalog::modelForDisplayName("Gemini 3.5 Flash");
+        request.effort = "Medium";
+
+        const QJsonArray messages = buildOpenaiChatPayload(request).value("messages").toArray();
+        QCOMPARE(messages.size(), 3);
+        QCOMPARE(messages.at(1).toObject().value("tool_calls").toArray().first().toObject().value("id").toString(), QString("call_1"));
+        QCOMPARE(messages.at(1).toObject().value("reasoning_details").toArray().first().toObject().value("data").toString(), QString("opaque"));
+        QCOMPARE(messages.at(2).toObject().value("role").toString(), QString("tool"));
+    }
+
+    void messageModelExposesToolCallIndicators()
+    {
+        ChatMessage assistant;
+        assistant.id = "a1";
+        assistant.role = "assistant";
+        assistant.rawOutputItems = QJsonArray{QJsonObject{
+            {"role", "assistant"},
+            {"content", ""},
+            {"tool_calls", QJsonArray{QJsonObject{
+                {"id", "call_1"},
+                {"type", "function"},
+                {"function", QJsonObject{{"name", "eval_javascript"}, {"arguments", "{\"javascript_source_code\":\"print(8)\"}"}}},
+            }}},
+        }};
+
+        ChatMessage tool;
+        tool.id = "t1";
+        tool.role = "assistant";
+        tool.rawOutputItems = QJsonArray{QJsonObject{
+            {"role", "tool"},
+            {"tool_call_id", "call_1"},
+            {"content", "{\"success\":true,\"prints\":\"8\\n\"}"},
+        }};
+
+        ChatMessageModel model;
+        model.append(assistant);
+        QSignalSpy changed(&model, &ChatMessageModel::dataChanged);
+        model.append(tool);
+        QCOMPARE(changed.count(), 1);
+        const QVariantList calls = model.data(model.index(0), ChatMessageModel::ToolCallsRole).toList();
+        QCOMPARE(calls.size(), 1);
+        QCOMPARE(calls.first().toMap().value("label").toString(), QString("Code Interpreter"));
+        QVERIFY(calls.first().toMap().value("arguments").toString().contains("print(8)"));
+        QCOMPARE(calls.first().toMap().value("hasOutput").toBool(), true);
+        QVERIFY(calls.first().toMap().value("output").toString().contains("prints"));
+        QCOMPARE(model.data(model.index(1), ChatMessageModel::ToolOnlyRole).toBool(), true);
+    }
+
+    void messageModelExposesWebSearchIndicators()
+    {
+        ChatMessage assistant;
+        assistant.id = "a1";
+        assistant.role = "assistant";
+        assistant.toolIndicators = QJsonArray{QJsonObject{
+            {"type", "server_tool_call"},
+            {"name", "openrouter:web_search"},
+        }};
+
+        ChatMessageModel model;
+        model.append(assistant);
+        const QVariantList calls = model.data(model.index(0), ChatMessageModel::ToolCallsRole).toList();
+        QCOMPARE(calls.size(), 1);
+        QCOMPARE(calls.first().toMap().value("label").toString(), QString("Web Search"));
     }
 
     void markdownRendersBoldAndCodeFence()
@@ -203,6 +422,19 @@ private slots:
         parser.feed("event: test\ndata: {\"a\":1}\ndata: {\"b\":2}\n\n");
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.takeFirst().at(0).toString(), QString("test"));
+    }
+
+    void networkErrorsPreferProviderRawMetadata()
+    {
+        const QByteArray body = R"({
+            "error": {
+                "message": "Provider returned error",
+                "metadata": {
+                    "raw": "upstream rate-limited"
+                }
+            }
+        })";
+        QCOMPARE(ApiClientProbe::networkErrorText(nullptr, body), QString("upstream rate-limited"));
     }
 
     void exportUsesOaiChatMessagesShape()

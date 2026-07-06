@@ -23,6 +23,8 @@ add_library(mychatty_core STATIC
     src/core/ChatTypes.h
     src/core/ConversationStore.cpp
     src/core/ConversationStore.h
+    src/core/ConversationFileStore.cpp
+    src/core/ConversationFileStore.h
     src/core/MarkdownRenderer.cpp
     src/core/MarkdownRenderer.h
     src/core/ModelCatalog.cpp
@@ -37,9 +39,11 @@ add_library(mychatty_core STATIC
     src/core/SettingsStore.h
     src/core/SpeechService.cpp
     src/core/SpeechService.h
+    src/core/ToolExecutor.cpp
+    src/core/ToolExecutor.h
 )
 target_include_directories(mychatty_core PUBLIC src/core)
-target_link_libraries(mychatty_core PUBLIC Qt6::Core Qt6::Gui Qt6::Network)
+target_link_libraries(mychatty_core PUBLIC Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml)
 
 qt_add_executable(MyChatty
     MACOSX_BUNDLE

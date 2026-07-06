@@ -7,6 +7,7 @@
 #include "SpeechService.h"
 
 #include <QObject>
+#include <QTimer>
 #include <QVariantList>
 #include <memory>
 
@@ -66,6 +67,16 @@ signals:
 private:
     void setBusy(bool value);
     void setToast(const QString &message);
+    ChatRequest makeRequest() const;
+    void beginRequest(const ChatRequest &request, int assistantRow, int toolDepth);
+    bool continueAfterToolCalls(const ChatResult &result, ApiProvider provider, int toolDepth);
+    void queueTextDelta(int assistantRow, const QString &delta);
+    void queueReasoningDelta(int assistantRow, const QString &delta);
+    void flushStreamDeltas();
+    void completePendingRequestIfReady();
+    void resetStreamBuffer();
+    void ensureCurrentConversationId();
+    void importAttachmentsToWorkspace(const QList<Attachment> &attachments);
     void persistCurrentConversation();
     void refreshRecents();
     QString apiKeyForModel(const ModelInfo &model) const;
@@ -83,6 +94,17 @@ private:
     QString m_toast;
     std::unique_ptr<ApiClient> m_client;
     SpeechService m_speech;
+
+    QTimer m_streamFlushTimer;
+    int m_streamAssistantRow = -1;
+    QString m_pendingTextDelta;
+    QString m_pendingReasoningDelta;
+
+    bool m_hasPendingCompletion = false;
+    ChatResult m_pendingCompletionResult;
+    ApiProvider m_pendingCompletionProvider = ApiProvider::OpenRouterChat;
+    bool m_pendingCompletionWebSearchEnabled = false;
+    int m_pendingCompletionToolDepth = 0;
 };
 
 } // namespace MyChatty

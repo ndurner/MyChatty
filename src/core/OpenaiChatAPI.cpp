@@ -16,6 +16,8 @@ void OpenaiChatAPI::send(const ChatRequest &request)
     m_done = false;
     m_result = {};
     m_responseBody.clear();
+    m_reasoningDetails = {};
+    m_toolCalls.clear();
 
     QNetworkRequest networkRequest = jsonRequest(QUrl("https://openrouter.ai/api/v1/chat/completions"), request.apiKey);
     networkRequest.setRawHeader("HTTP-Referer", "https://github.com/ndurner/MyChatty");
@@ -54,8 +56,12 @@ void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
 
     if (object.contains("error")) {
         const QJsonObject error = object.value("error").toObject();
+        QString message = error.value("metadata").toObject().value("raw").toString();
+        if (message.isEmpty()) {
+            message = error.value("message").toString(QStringLiteral("OpenRouter request failed"));
+        }
         m_done = true;
-        emit failed(error.value("message").toString(QStringLiteral("OpenRouter request failed")));
+        emit failed(message);
         return;
     }
 
@@ -77,7 +83,34 @@ void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
             m_result.reasoning += reasoning;
             emit reasoningDelta(reasoning);
         }
+        if (delta.contains("reasoning_details")) {
+            const QJsonArray details = delta.value("reasoning_details").toArray();
+            for (const QJsonValue &detail : details) {
+                m_reasoningDetails.append(detail);
+            }
+        }
         if (delta.contains("tool_calls")) {
+            const QJsonArray calls = delta.value("tool_calls").toArray();
+            for (const QJsonValue &callValue : calls) {
+                const QJsonObject deltaCall = callValue.toObject();
+                const int index = deltaCall.value("index").toInt(m_toolCalls.size());
+                QJsonObject call = m_toolCalls.value(index);
+                if (deltaCall.contains("id")) {
+                    call["id"] = deltaCall.value("id").toString();
+                }
+                call["type"] = deltaCall.value("type").toString(call.value("type").toString("function"));
+                QJsonObject function = call.value("function").toObject();
+                const QJsonObject deltaFunction = deltaCall.value("function").toObject();
+                if (deltaFunction.contains("name")) {
+                    function["name"] = deltaFunction.value("name").toString();
+                }
+                if (deltaFunction.contains("arguments")) {
+                    function["arguments"] = function.value("arguments").toString()
+                        + deltaFunction.value("arguments").toString();
+                }
+                call["function"] = function;
+                m_toolCalls.insert(index, call);
+            }
             emit toolEvent(delta);
         }
     }
@@ -113,6 +146,24 @@ void OpenaiChatAPI::completeIfNeeded()
 {
     if (m_done) {
         return;
+    }
+    if (!m_toolCalls.isEmpty()) {
+        QJsonArray calls;
+        for (auto it = m_toolCalls.cbegin(); it != m_toolCalls.cend(); ++it) {
+            calls.append(it.value());
+        }
+        QJsonObject assistant{
+            {"role", "assistant"},
+            {"content", m_result.text},
+            {"tool_calls", calls},
+        };
+        if (!m_reasoningDetails.isEmpty()) {
+            assistant["reasoning_details"] = m_reasoningDetails;
+        }
+        if (!m_result.reasoning.isEmpty()) {
+            assistant["reasoning"] = m_result.reasoning;
+        }
+        m_result.rawOutputItems.append(assistant);
     }
     m_done = true;
     emit completed(m_result);
