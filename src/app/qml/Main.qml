@@ -105,11 +105,6 @@ ApplicationWindow {
         delegate: ChatBubble {
             controller: chatController
         }
-        onCountChanged: Qt.callLater(positionViewAtEnd)
-        onContentHeightChanged: {
-            if (chatController.busy)
-                Qt.callLater(positionViewAtEnd)
-        }
     }
 
     Item {
