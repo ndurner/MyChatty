@@ -8,9 +8,11 @@
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
 
@@ -33,10 +35,30 @@ static QString openAIKey()
     return QString::fromUtf8(env).trimmed();
 }
 
+static QString openAIKey(bool settingsKeys)
+{
+    const QString key = openAIKey();
+    if (!key.isEmpty() || !settingsKeys) {
+        return key;
+    }
+    QSettings settings("NilsDurner", "MyChatty");
+    return settings.value("openAIKey").toString().trimmed();
+}
+
 static QString openRouterKey()
 {
     const QByteArray env = qgetenv("OPENROUTER_API_KEY");
     return QString::fromUtf8(env).trimmed();
+}
+
+static QString openRouterKey(bool settingsKeys)
+{
+    const QString key = openRouterKey();
+    if (!key.isEmpty() || !settingsKeys) {
+        return key;
+    }
+    QSettings settings("NilsDurner", "MyChatty");
+    return settings.value("openRouterKey").toString().trimmed();
 }
 
 static QString exaKey()
@@ -82,6 +104,9 @@ int main(int argc, char *argv[])
         {"json", "Print result JSON instead of streaming plain text."},
         {"dry-run", "Print the JSON request payload and exit."},
         {"no-cache", "Bypass and overwrite the CLI response cache."},
+        {"code-interpreter", "Advertise the local eval_javascript Code Interpreter tool."},
+        {"settings-keys", "Read missing provider API keys from the MyChatty app QSettings domain."},
+        {"trace-stream", "Print timestamped text and reasoning deltas for streaming diagnostics."},
     });
     parser.process(app);
 
@@ -124,8 +149,11 @@ int main(int argc, char *argv[])
     request.exaApiKey = exaKey();
     request.enableWebSearch = parser.isSet("web-search");
     request.useExaSearch = parser.isSet("exa-search");
+    request.enableJavaScriptUse = parser.isSet("code-interpreter");
     request.stream = true;
-    request.apiKey = model.provider == ApiProvider::OpenRouterChat ? openRouterKey() : openAIKey();
+    request.apiKey = model.provider == ApiProvider::OpenRouterChat
+        ? openRouterKey(parser.isSet("settings-keys"))
+        : openAIKey(parser.isSet("settings-keys"));
 
     const QJsonObject payload = model.provider == ApiProvider::OpenRouterChat
         ? buildOpenaiChatPayload(request)
@@ -163,9 +191,26 @@ int main(int argc, char *argv[])
     }
 
     int exitCode = 0;
+    QElapsedTimer timer;
+    timer.start();
+    int textDeltaCount = 0;
+    int reasoningDeltaCount = 0;
     QObject::connect(client.get(), &ApiClient::textDelta, &app, [&](const QString &delta) {
-        if (!parser.isSet("json")) {
+        ++textDeltaCount;
+        if (parser.isSet("trace-stream")) {
+            QTextStream(stdout) << QString::number(timer.elapsed() / 1000.0, 'f', 3)
+                                << "s text " << textDeltaCount << ": "
+                                << QJsonDocument(QJsonArray{delta}).toJson(QJsonDocument::Compact) << "\n" << Qt::flush;
+        } else if (!parser.isSet("json")) {
             QTextStream(stdout) << delta << Qt::flush;
+        }
+    });
+    QObject::connect(client.get(), &ApiClient::reasoningDelta, &app, [&](const QString &delta) {
+        ++reasoningDeltaCount;
+        if (parser.isSet("trace-stream")) {
+            QTextStream(stdout) << QString::number(timer.elapsed() / 1000.0, 'f', 3)
+                                << "s reasoning " << reasoningDeltaCount << ": "
+                                << QJsonDocument(QJsonArray{delta}).toJson(QJsonDocument::Compact) << "\n" << Qt::flush;
         }
     });
     QObject::connect(client.get(), &ApiClient::completed, &app, [&](const ChatResult &result) {
@@ -181,7 +226,11 @@ int main(int argc, char *argv[])
         if (cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             cacheFile.write(QJsonDocument(output).toJson(QJsonDocument::Indented));
         }
-        if (parser.isSet("json")) {
+        if (parser.isSet("trace-stream")) {
+            QTextStream(stdout) << QString::number(timer.elapsed() / 1000.0, 'f', 3)
+                                << "s complete text_deltas=" << textDeltaCount
+                                << " reasoning_deltas=" << reasoningDeltaCount << "\n";
+        } else if (parser.isSet("json")) {
             QTextStream(stdout) << QJsonDocument(output).toJson(QJsonDocument::Indented);
         } else {
             QTextStream(stdout) << "\n";
