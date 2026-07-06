@@ -103,7 +103,6 @@ private:
     bool m_hasPendingCompletion = false;
     ChatResult m_pendingCompletionResult;
     ApiProvider m_pendingCompletionProvider = ApiProvider::OpenRouterChat;
-    bool m_pendingCompletionWebSearchEnabled = false;
     int m_pendingCompletionToolDepth = 0;
 };
 

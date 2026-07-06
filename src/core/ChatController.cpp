@@ -256,11 +256,10 @@ void ChatController::beginRequest(const ChatRequest &request, int assistantRow, 
         const QString type = event.value("type").toString("tool event");
         setToast(QStringLiteral("Tool event: %1").arg(type));
     });
-    connect(m_client.get(), &ApiClient::completed, this, [this, assistantRow, provider = request.model.provider, webSearchEnabled = request.enableWebSearch, toolDepth](const ChatResult &result) {
+    connect(m_client.get(), &ApiClient::completed, this, [this, assistantRow, provider = request.model.provider, toolDepth](const ChatResult &result) {
         m_hasPendingCompletion = true;
         m_pendingCompletionResult = result;
         m_pendingCompletionProvider = provider;
-        m_pendingCompletionWebSearchEnabled = webSearchEnabled;
         m_pendingCompletionToolDepth = toolDepth;
         m_streamAssistantRow = assistantRow;
         completePendingRequestIfReady();
@@ -361,13 +360,11 @@ void ChatController::completePendingRequestIfReady()
 
     const ChatResult result = m_pendingCompletionResult;
     const ApiProvider provider = m_pendingCompletionProvider;
-    const bool webSearchEnabled = m_pendingCompletionWebSearchEnabled;
     const int toolDepth = m_pendingCompletionToolDepth;
     const int assistantRow = m_streamAssistantRow;
 
     m_hasPendingCompletion = false;
     m_pendingCompletionResult = {};
-    m_pendingCompletionWebSearchEnabled = false;
     m_pendingCompletionToolDepth = 0;
 
     ChatMessage *message = assistantMessageAt(assistantRow);
@@ -379,12 +376,6 @@ void ChatController::completePendingRequestIfReady()
             message->reasoning = result.reasoning;
         }
         message->rawOutputItems = result.rawOutputItems;
-        if (provider == ApiProvider::OpenRouterChat && webSearchEnabled) {
-            message->toolIndicators = QJsonArray{QJsonObject{
-                {"type", "server_tool_call"},
-                {"name", "openrouter:web_search"},
-            }};
-        }
         message->rawResponse = result.rawResponse;
         message->streaming = false;
         m_messages.update(assistantRow, *message);
