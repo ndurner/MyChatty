@@ -16,6 +16,7 @@ static QString escapeHtml(QString text)
 static QString renderInline(QString text)
 {
     text = escapeHtml(std::move(text));
+    text.replace(QRegularExpression("&lt;br\\s*/?&gt;", QRegularExpression::CaseInsensitiveOption), "<br/>");
 
     text.replace(QRegularExpression("`([^`]+)`"),
                  "<code style=\"font-family:Menlo, Consolas, monospace; background-color:#f1f1f1;\">\\1</code>");
@@ -113,7 +114,7 @@ static bool looksLikeTableRow(const QString &line)
     return line.contains('|') && line.trimmed().count('|') >= 2;
 }
 
-static QVariantList tableCells(const QString &line)
+static QStringList splitTableCells(const QString &line)
 {
     QString row = line.trimmed();
     if (row.startsWith('|')) {
@@ -122,14 +123,72 @@ static QVariantList tableCells(const QString &line)
     if (row.endsWith('|')) {
         row.chop(1);
     }
+    return row.split('|');
+}
 
-    QVariantList cells;
-    for (const QString &cell : row.split('|')) {
+static QVariantList tableCells(const QStringList &cells)
+{
+    QVariantList values;
+    for (const QString &cell : cells) {
         QVariantMap value;
         value["html"] = renderInline(cell.trimmed());
-        cells.append(value);
+        values.append(value);
     }
-    return cells;
+    return values;
+}
+
+static bool shouldContinueTableRow(const QString &line)
+{
+    const QString trimmed = line.trimmed();
+    if (trimmed.isEmpty()) {
+        return false;
+    }
+    if (looksLikeTableRow(line)) {
+        return true;
+    }
+    if (trimmed.startsWith("```")
+        || trimmed == "---"
+        || trimmed == "***"
+        || trimmed.startsWith('>')
+        || QRegularExpression("^#{1,6}\\s+").match(trimmed).hasMatch()) {
+        return false;
+    }
+    return true;
+}
+
+static QVariantMap parseTableRow(const QStringList &lines, int columnCount)
+{
+    QStringList cells = splitTableCells(lines.value(0));
+    while (cells.size() < columnCount) {
+        cells.append(QString());
+    }
+
+    for (int i = 1; i < lines.size(); ++i) {
+        const QString continuation = lines.at(i).trimmed();
+        if (continuation.isEmpty()) {
+            continue;
+        }
+        const int target = qMax(0, qMin(cells.size() - 1, columnCount - 1));
+        if (!cells[target].trimmed().isEmpty()) {
+            cells[target] += QStringLiteral("<br>");
+        }
+        cells[target] += continuation;
+    }
+
+    if (cells.size() > columnCount) {
+        QString overflow;
+        while (cells.size() > columnCount) {
+            if (!overflow.isEmpty()) {
+                overflow.prepend(QStringLiteral(" | "));
+            }
+            overflow.prepend(cells.takeLast());
+        }
+        cells[columnCount - 1] += QStringLiteral(" | ") + overflow;
+    }
+
+    QVariantMap row;
+    row["cells"] = tableCells(cells);
+    return row;
 }
 
 static QVariantList parseBlocks(const QString &markdown)
@@ -221,14 +280,25 @@ static QVariantList parseBlocks(const QString &markdown)
             && looksLikeTableSeparator(lines.at(lineIndex + 1))) {
             flushBlocks();
             QVariantMap row = block("table");
-            row["headers"] = tableCells(line);
+            const QStringList headers = splitTableCells(line);
+            row["headers"] = tableCells(headers);
+            const int columnCount = qMax(1, headers.size());
             QVariantList bodyRows;
             lineIndex += 2;
-            while (lineIndex < lines.size() && looksLikeTableRow(lines.at(lineIndex))) {
-                QVariantMap bodyRow;
-                bodyRow["cells"] = tableCells(lines.at(lineIndex));
-                bodyRows.append(bodyRow);
+            while (lineIndex < lines.size() && shouldContinueTableRow(lines.at(lineIndex))) {
+                if (!looksLikeTableRow(lines.at(lineIndex))) {
+                    break;
+                }
+
+                QStringList rowLines{lines.at(lineIndex)};
                 ++lineIndex;
+                while (lineIndex < lines.size()
+                       && shouldContinueTableRow(lines.at(lineIndex))
+                       && !looksLikeTableRow(lines.at(lineIndex))) {
+                    rowLines.append(lines.at(lineIndex));
+                    ++lineIndex;
+                }
+                bodyRows.append(parseTableRow(rowLines, columnCount));
             }
             --lineIndex;
             row["rows"] = bodyRows;

@@ -400,6 +400,33 @@ private slots:
         QCOMPARE(items.at(2).toMap().value("ordered").toBool(), true);
     }
 
+    void markdownParsesMultilineTableRows()
+    {
+        const QVariantList blocks = MarkdownRenderer::renderBlocks(
+            "| Field | Details |\n"
+            "|-------|---------|\n"
+            "| **Profession** | Software engineer. |\n"
+            "| **Current focus** |  \n"
+            "* Research and engineering in generative AI\n"
+            "* Security and privacy |\n"
+            "| **Output** | Papers <br> Patents <br> Talks |\n");
+
+        QCOMPARE(blocks.size(), 1);
+        const QVariantMap table = blocks.first().toMap();
+        QCOMPARE(table.value("type").toString(), QString("table"));
+        const QVariantList rows = table.value("rows").toList();
+        QCOMPARE(rows.size(), 3);
+        const QVariantList focusCells = rows.at(1).toMap().value("cells").toList();
+        const QString focus = focusCells.at(1).toMap().value("html").toString();
+        QVERIFY(focus.contains("Research and engineering"));
+        QVERIFY(focus.contains("Security and privacy"));
+        QVERIFY(!focus.contains("&lt;br"));
+
+        const QString html = MarkdownRenderer::render("Line one <br> line two");
+        QVERIFY(html.contains("<br/>"));
+        QVERIFY(!html.contains("&lt;br"));
+    }
+
     void markdownRendersLinks()
     {
         const QString html = MarkdownRenderer::render(
