@@ -191,64 +191,29 @@ Popup {
                     }
                     Rectangle {
                         width: parent.width
-                        height: 144
+                        height: 76
                         radius: 26
                         color: "#ffffff"
-                        Column {
+                        Item {
                             anchors.fill: parent
                             anchors.leftMargin: 22
                             anchors.rightMargin: 18
-                            spacing: 0
-
-                            Item {
-                                width: parent.width
-                                height: 72
-                                Text {
-                                    anchors.left: parent.left
-                                    anchors.right: webSearchSwitch.left
-                                    anchors.rightMargin: 12
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "Web Search"
-                                    color: "#111111"
-                                    font.pixelSize: 22
-                                    elide: Text.ElideRight
-                                }
-                                Switch {
-                                    id: webSearchSwitch
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    checked: store.webSearchEnabled
-                                    onToggled: store.webSearchEnabled = checked
-                                }
+                            Text {
+                                anchors.left: parent.left
+                                anchors.right: exaSearchSwitch.left
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Use Exa"
+                                color: "#111111"
+                                font.pixelSize: 22
+                                elide: Text.ElideRight
                             }
-
-                            Rectangle {
-                                width: parent.width
-                                height: 1
-                                color: "#eeeeee"
-                            }
-
-                            Item {
-                                width: parent.width
-                                height: 71
-                                Text {
-                                    anchors.left: parent.left
-                                    anchors.right: exaSearchSwitch.left
-                                    anchors.rightMargin: 12
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "Use Exa"
-                                    color: webSearchSwitch.checked ? "#111111" : "#aaaaaa"
-                                    font.pixelSize: 22
-                                    elide: Text.ElideRight
-                                }
-                                Switch {
-                                    id: exaSearchSwitch
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    enabled: webSearchSwitch.checked
-                                    checked: store.exaSearchEnabled
-                                    onToggled: store.exaSearchEnabled = checked
-                                }
+                            Switch {
+                                id: exaSearchSwitch
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                checked: store.exaSearchEnabled
+                                onToggled: store.exaSearchEnabled = checked
                             }
                         }
                     }

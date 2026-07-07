@@ -214,8 +214,9 @@ The built-in model catalog currently contains:
 | Kimi K2.6 | `moonshotai/kimi-k2.6` | OpenRouter | Moonshot AI |
 | Gemma 4 Free | `google/gemma-4-26b-a4b-it:free` | OpenRouter | |
 
-Web search is controlled by two settings. `Web Search` is enabled by default.
-When `Use Exa` is disabled, OpenAI uses the Responses API `web_search` tool and
+Web search is controlled by the `Web Search` plugin in the `+` attachment menu
+and the `Use Exa` switch in Settings. `Web Search` is enabled by default. When
+`Use Exa` is disabled, OpenAI uses the Responses API `web_search` tool and
 OpenRouter uses its `web` plugin without forcing an engine; forcing
 `engine: "native"` can fail on models that do not support native provider
 search. When `Use Exa` is enabled, OpenAI uses [Exa](https://exa.ai/) through

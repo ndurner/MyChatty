@@ -134,6 +134,36 @@ Canvas {
             ctx.beginPath()
             ctx.arc(25.5, 25.2, 1, 0, Math.PI * 2)
             ctx.fill()
+        } else if (iconName === "webSearch") {
+            ctx.beginPath()
+            ctx.arc(13.5, 14, 7.2, 0, Math.PI * 2)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(18.8, 19.2)
+            ctx.lineTo(25, 25.4)
+            ctx.stroke()
+
+            ctx.beginPath()
+            ctx.moveTo(6.3, 14)
+            ctx.lineTo(20.7, 14)
+            ctx.moveTo(13.5, 6.8)
+            ctx.bezierCurveTo(16, 9.3, 16, 18.7, 13.5, 21.2)
+            ctx.moveTo(13.5, 6.8)
+            ctx.bezierCurveTo(11, 9.3, 11, 18.7, 13.5, 21.2)
+            ctx.stroke()
+
+            ctx.fillStyle = root.accent
+            ctx.beginPath()
+            ctx.moveTo(22.8, 4.2)
+            ctx.lineTo(23.9, 7.1)
+            ctx.lineTo(26.8, 8.2)
+            ctx.lineTo(23.9, 9.3)
+            ctx.lineTo(22.8, 12.2)
+            ctx.lineTo(21.7, 9.3)
+            ctx.lineTo(18.8, 8.2)
+            ctx.lineTo(21.7, 7.1)
+            ctx.closePath()
+            ctx.fill()
         }
     }
 }
