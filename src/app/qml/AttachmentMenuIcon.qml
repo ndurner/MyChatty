@@ -103,6 +103,37 @@ Canvas {
             ctx.moveTo(13, 20.5)
             ctx.lineTo(17, 20.5)
             ctx.stroke()
+        } else if (iconName === "webBrowser") {
+            roundedRect(ctx, 4, 6, 22, 18, 4)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(4, 11)
+            ctx.lineTo(26, 11)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.arc(8, 8.5, 0.8, 0, Math.PI * 2)
+            ctx.arc(11, 8.5, 0.8, 0, Math.PI * 2)
+            ctx.fill()
+
+            ctx.beginPath()
+            ctx.arc(15, 17.5, 5.2, 0, Math.PI * 2)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(9.8, 17.5)
+            ctx.lineTo(20.2, 17.5)
+            ctx.moveTo(15, 12.3)
+            ctx.bezierCurveTo(17, 14.2, 17, 20.8, 15, 22.7)
+            ctx.moveTo(15, 12.3)
+            ctx.bezierCurveTo(13, 14.2, 13, 20.8, 15, 22.7)
+            ctx.stroke()
+
+            ctx.beginPath()
+            ctx.moveTo(20.5, 20.2)
+            ctx.lineTo(25.5, 25.2)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.arc(25.5, 25.2, 1, 0, Math.PI * 2)
+            ctx.fill()
         }
     }
 }

@@ -79,7 +79,7 @@ Popup {
                     color: "#e7e7e7"
                     AttachmentMenuIcon {
                         anchors.centerIn: parent
-                        iconName: "plugins"
+                        iconName: "webBrowser"
                         stroke: "#111111"
                         accent: "#111111"
                     }
