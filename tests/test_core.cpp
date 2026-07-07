@@ -229,13 +229,27 @@ private slots:
         QCOMPARE(tools.size(), 1);
         QCOMPARE(tools.at(0).toObject().value("name").toString(), QString("eval_javascript"));
 
+        request.enableWebBrowser = true;
+        request.enablePageScreenshots = true;
+        payload = buildOpenaiResponsesPayload(request);
+        tools = payload.value("tools").toArray();
+        QCOMPARE(tools.size(), 4);
+        QCOMPARE(tools.at(1).toObject().value("name").toString(), QString("open_web_page"));
+        QVERIFY(tools.at(1).toObject().value("parameters").toObject().value("required").toArray().contains("url_provenance"));
+        QCOMPARE(tools.at(2).toObject().value("name").toString(), QString("read_web_page_text"));
+        QCOMPARE(tools.at(3).toObject().value("name").toString(), QString("get_next_web_page_screenshot"));
+        request.enablePageScreenshots = false;
+
         request.model = ModelCatalog::modelForDisplayName("Gemini 3.5 Flash");
         payload = buildOpenaiChatPayload(request);
         tools = payload.value("tools").toArray();
-        QCOMPARE(tools.size(), 1);
+        QCOMPARE(tools.size(), 3);
         const QJsonObject function = tools.at(0).toObject().value("function").toObject();
         QCOMPARE(function.value("name").toString(), QString("eval_javascript"));
         QVERIFY(!function.value("parameters").toObject().contains("additionalProperties"));
+        QCOMPARE(tools.at(1).toObject().value("function").toObject().value("name").toString(), QString("open_web_page"));
+        QVERIFY(tools.at(1).toObject().value("function").toObject().value("parameters").toObject().value("required").toArray().contains("url_provenance"));
+        QCOMPARE(tools.at(2).toObject().value("function").toObject().value("name").toString(), QString("read_web_page_text"));
         QCOMPARE(payload.value("reasoning").toObject().value("effort").toString(), QString("medium"));
     }
 
@@ -365,6 +379,26 @@ private slots:
         const QVariantList calls = model.data(model.index(0), ChatMessageModel::ToolCallsRole).toList();
         QCOMPARE(calls.size(), 1);
         QCOMPARE(calls.first().toMap().value("label").toString(), QString("Web Search"));
+    }
+
+    void messageModelExposesToolApproval()
+    {
+        ChatMessage assistant;
+        assistant.id = "a1";
+        assistant.role = "assistant";
+        assistant.approval = QJsonObject{
+            {"id", "approval_1"},
+            {"type", "open_web_page"},
+            {"status", "pending"},
+            {"url", "https://example.com"},
+        };
+
+        ChatMessageModel model;
+        model.append(assistant);
+        const QVariantMap approval = model.data(model.index(0), ChatMessageModel::ApprovalRole).toMap();
+        QCOMPARE(approval.value("type").toString(), QString("open_web_page"));
+        QCOMPARE(approval.value("status").toString(), QString("pending"));
+        QCOMPARE(approval.value("url").toString(), QString("https://example.com"));
     }
 
     void markdownRendersBoldAndCodeFence()

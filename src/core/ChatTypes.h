@@ -39,6 +39,7 @@ struct ChatMessage {
     QList<Attachment> attachments;
     QDateTime createdAt;
     QString reasoning;
+    QJsonObject approval;
     QJsonArray rawOutputItems;
     QJsonArray toolIndicators;
     QJsonObject rawResponse;
@@ -59,6 +60,8 @@ struct ChatRequest {
     bool enableWebSearch = false;
     bool useExaSearch = false;
     bool enableJavaScriptUse = false;
+    bool enableWebBrowser = false;
+    bool enablePageScreenshots = false;
     int maxOutputTokens = 0;
     bool stream = true;
 };

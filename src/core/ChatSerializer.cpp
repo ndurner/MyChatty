@@ -106,6 +106,7 @@ QJsonObject ChatSerializer::messageToStoreJson(const ChatMessage &message)
         {"text", message.text},
         {"createdAt", message.createdAt.toUTC().toString(Qt::ISODateWithMs)},
         {"reasoning", message.reasoning},
+        {"approval", message.approval},
         {"attachments", attachments},
         {"rawOutputItems", message.rawOutputItems},
         {"toolIndicators", message.toolIndicators},
@@ -124,6 +125,7 @@ ChatMessage ChatSerializer::messageFromStoreJson(const QJsonObject &object)
         message.createdAt = QDateTime::currentDateTimeUtc();
     }
     message.reasoning = object.value("reasoning").toString();
+    message.approval = object.value("approval").toObject();
     message.rawOutputItems = object.value("rawOutputItems").toArray();
     message.toolIndicators = object.value("toolIndicators").toArray();
     message.rawResponse = object.value("rawResponse").toObject();

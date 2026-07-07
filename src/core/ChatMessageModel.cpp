@@ -33,6 +33,15 @@ QString toolLabel(const QString &name)
     if (name == QStringLiteral("eval_javascript")) {
         return QStringLiteral("Code Interpreter");
     }
+    if (name == QStringLiteral("open_web_page")) {
+        return QStringLiteral("Open Web Page");
+    }
+    if (name == QStringLiteral("read_web_page_text")) {
+        return QStringLiteral("Read Web Page");
+    }
+    if (name == QStringLiteral("get_next_web_page_screenshot")) {
+        return QStringLiteral("Web Page Screenshot");
+    }
     if (name == QStringLiteral("openrouter:web_search") || name == QStringLiteral("web_search")) {
         return QStringLiteral("Web Search");
     }
@@ -186,6 +195,8 @@ QVariant ChatMessageModel::data(const QModelIndex &index, int role) const
         return toolCallsForMessage(m_messages, index.row());
     case ToolOnlyRole:
         return isToolOnlyMessage(message);
+    case ApprovalRole:
+        return message.approval.toVariantMap();
     case ReasoningRole:
         return message.reasoning;
     case IsUserRole:
@@ -224,6 +235,7 @@ QHash<int, QByteArray> ChatMessageModel::roleNames() const
         {BlocksRole, "blocks"},
         {ToolCallsRole, "toolCalls"},
         {ToolOnlyRole, "toolOnly"},
+        {ApprovalRole, "approval"},
     };
 }
 

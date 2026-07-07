@@ -28,6 +28,11 @@ without duplicating request serialization or streaming parsing code.
 - Settings for OpenAI and OpenRouter API keys plus Custom instructions.
 - Web search settings for provider-backed search and optional
   [Exa](https://exa.ai/) search.
+- Optional Code Interpreter plugin for local JavaScript evaluation.
+- Optional Web Browser plugin that opens approved web pages in a local Qt
+  WebView, extracts readable text with Mozilla Readability, caches line-range
+  text slices, and can provide sequential screenshot tiles when enabled in
+  Advanced Settings.
 - Local conversation persistence with a Recents sidebar.
 - Share/export to an `oai_chat`-style JSON shape: a top-level `messages` array
   containing system, user, and assistant messages.
@@ -43,6 +48,7 @@ src/app/qml/      QML views and controls
 src/core/         Shared provider, storage, Markdown, settings, and TTS code
 src/cli/          Terminal client using the shared core
 tests/            Qt Test coverage for core behavior
+third_party/      Vendored third-party code and license texts
 ```
 
 The main build targets are:
@@ -55,7 +61,7 @@ The main build targets are:
 
 - CMake 3.25 or newer.
 - Qt 6.8 or newer with Core, Gui, Network, Qml, Quick, Quick Controls 2,
-  Quick Dialogs 2, and Test.
+  Quick Dialogs 2, Test, and WebView.
 - A C++20 compiler.
 - API keys for live provider calls:
   - `OPENAI_API_KEY` for OpenAI Responses and text-to-speech.
@@ -149,9 +155,35 @@ Useful options:
 - `--json`: prints text, reasoning, raw output items, raw response, raw events,
   and usage as JSON.
 - `--no-cache`: bypasses the CLI response cache.
+- `--code-interpreter`: advertises the local JavaScript tool in CLI requests.
 
 By default, live CLI responses are cached under the platform cache directory so
 repeat probes do not spend API credits unnecessarily.
+
+## Local Tools
+
+The `+` attachment menu contains a Plugins section.
+
+- `Code Interpreter` advertises `eval_javascript`, a local Qt `QJSEngine`
+  sandbox for arithmetic, JSON/date/string processing, and scoped conversation
+  files.
+- `Web Browser` advertises `open_web_page` and `read_web_page_text`. It opens
+  `http`/`https` URLs in a local Qt WebView, runs Mozilla Readability once,
+  caches the extracted text, and lets the model request later line ranges
+  without reloading the page. A provenance check allows exact URLs found in user
+  messages or provider web-search results. Model-constructed URLs pause for
+  inline Yes/No/Always approval before network access; Always applies to that
+  host for the current app session.
+
+`Page Screenshots` lives in Settings under `Advanced Settings`. When enabled,
+and when the selected model supports images, Web Browser also advertises
+`get_next_web_page_screenshot`. Screenshots are captured as overlapping vertical
+tiles and returned sequentially so the model does not need to manage viewport
+coordinates.
+
+Web page text and screenshots are untrusted content. They can provide facts and
+links, but they must not be treated as instructions that override the user,
+developer, or system rules.
 
 ## Provider Notes
 
@@ -192,6 +224,18 @@ web plugin with `engine: "exa"`; this is not the Exa MCP path. The optional Exa
 API key is attached to the OpenAI MCP URL and can also be supplied to the CLI as
 `EXA_API_KEY`.
 
+## Third-Party Code
+
+MyChatty vendors Mozilla Readability for Web Browser article extraction:
+
+- `third_party/readability/Readability.js`
+- Upstream: https://github.com/mozilla/readability
+- License: Apache License, Version 2.0
+
+The Apache-2.0 license text is included at
+`third_party/readability/LICENSE.md`, and a concise attribution notice is kept
+in `THIRD_PARTY_NOTICES.md`.
+
 ## Storage And Export
 
 Conversations are stored via `QStandardPaths::AppDataLocation` in
@@ -225,10 +269,13 @@ data URL.
 
 ## Current Limitations
 
-- Microphone/dictation and Plugins are UI placeholders and currently report
+- Microphone/dictation is a UI placeholder and currently reports
   `Not implemented`.
 - Attachment selection and export metadata exist, but provider-specific upload
   handling is still intentionally conservative.
+- Web Browser host-level Always approvals are session-only. User-provided URL
+  and provider web-search URL provenance are recognized locally; persistent
+  allow-list management is not implemented yet.
 - OpenAI text-to-speech is implemented for read-aloud; OpenRouter TTS is not.
 - The repository currently has no committed history in this checkout, so the
   Codex thread history is the best record of how the project was created.

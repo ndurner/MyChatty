@@ -50,6 +50,7 @@ public:
     Q_INVOKABLE void copyMessage(int row);
     Q_INVOKABLE void shareMessage(int row);
     Q_INVOKABLE void readAloud(int row);
+    Q_INVOKABLE void resolveToolApproval(int row, const QString &decision);
     Q_INVOKABLE void newChat();
     Q_INVOKABLE void loadConversation(const QString &id);
     Q_INVOKABLE void notifyNotImplemented(const QString &feature);
@@ -70,6 +71,8 @@ private:
     ChatRequest makeRequest() const;
     void beginRequest(const ChatRequest &request, int assistantRow, int toolDepth);
     bool continueAfterToolCalls(const ChatResult &result, ApiProvider provider, int toolDepth);
+    bool requestWebApprovalIfNeeded(ApiProvider provider, int toolDepth, const QString &callId, const QString &name, const QJsonObject &arguments);
+    void appendToolOutputAndContinue(ApiProvider provider, int toolDepth, const QString &callId, const QJsonObject &output);
     void queueTextDelta(int assistantRow, const QString &delta);
     void queueReasoningDelta(int assistantRow, const QString &delta);
     void flushStreamDeltas();
@@ -82,6 +85,16 @@ private:
     QString apiKeyForModel(const ModelInfo &model) const;
     QString titleForConversation() const;
     ChatMessage *assistantMessageAt(int row);
+
+    struct PendingToolApproval {
+        bool active = false;
+        QString approvalId;
+        ApiProvider provider = ApiProvider::OpenRouterChat;
+        int toolDepth = 0;
+        QString callId;
+        QString name;
+        QJsonObject arguments;
+    };
 
     SettingsStore *m_settings = nullptr;
     ChatMessageModel m_messages;
@@ -104,6 +117,8 @@ private:
     ChatResult m_pendingCompletionResult;
     ApiProvider m_pendingCompletionProvider = ApiProvider::OpenRouterChat;
     int m_pendingCompletionToolDepth = 0;
+    PendingToolApproval m_pendingToolApproval;
+    QStringList m_alwaysApprovedWebHosts;
 };
 
 } // namespace MyChatty

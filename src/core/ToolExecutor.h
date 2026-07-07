@@ -16,6 +16,9 @@ public:
 
 private:
     QJsonObject evalJavaScript(const QJsonObject &arguments) const;
+    QJsonObject openPage(const QJsonObject &arguments) const;
+    QJsonObject readPageText(const QJsonObject &arguments) const;
+    QJsonObject getNextScreenshot(const QJsonObject &arguments) const;
 
     SettingsStore *m_settings = nullptr;
     QString m_conversationId;

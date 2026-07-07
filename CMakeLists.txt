@@ -5,8 +5,9 @@ project(MyChatty VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
+set(QT_SKIP_AUTO_PLUGIN_INCLUSION ON)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network Qml Quick QuickControls2 QuickDialogs2 Test)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network Qml Quick QuickControls2 QuickDialogs2 Test WebView)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -43,7 +44,13 @@ add_library(mychatty_core STATIC
     src/core/ToolExecutor.h
 )
 target_include_directories(mychatty_core PUBLIC src/core)
-target_link_libraries(mychatty_core PUBLIC Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml)
+target_link_libraries(mychatty_core PUBLIC Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::WebView)
+
+qt_add_resources(mychatty_core "reader_resources"
+    PREFIX "/"
+    FILES
+        third_party/readability/Readability.js
+)
 
 qt_add_executable(MyChatty
     MACOSX_BUNDLE

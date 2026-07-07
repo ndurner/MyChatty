@@ -50,6 +50,16 @@ bool SettingsStore::javaScriptUseEnabled() const
     return m_javaScriptUseEnabled;
 }
 
+bool SettingsStore::webBrowserEnabled() const
+{
+    return m_webBrowserEnabled;
+}
+
+bool SettingsStore::pageScreenshotsEnabled() const
+{
+    return m_pageScreenshotsEnabled;
+}
+
 void SettingsStore::setOpenAIKey(const QString &value)
 {
     if (m_openAIKey == value) {
@@ -123,6 +133,24 @@ void SettingsStore::setJavaScriptUseEnabled(bool value)
     emit javaScriptUseEnabledChanged();
 }
 
+void SettingsStore::setWebBrowserEnabled(bool value)
+{
+    if (m_webBrowserEnabled == value) {
+        return;
+    }
+    m_webBrowserEnabled = value;
+    emit webBrowserEnabledChanged();
+}
+
+void SettingsStore::setPageScreenshotsEnabled(bool value)
+{
+    if (m_pageScreenshotsEnabled == value) {
+        return;
+    }
+    m_pageScreenshotsEnabled = value;
+    emit pageScreenshotsEnabledChanged();
+}
+
 void SettingsStore::save()
 {
     QSettings settings;
@@ -134,6 +162,8 @@ void SettingsStore::save()
     settings.setValue("webSearchEnabled", m_webSearchEnabled);
     settings.setValue("exaSearchEnabled", m_exaSearchEnabled);
     settings.setValue("javaScriptUseEnabled", m_javaScriptUseEnabled);
+    settings.setValue("webBrowserEnabled", m_webBrowserEnabled);
+    settings.setValue("pageScreenshotsEnabled", m_pageScreenshotsEnabled);
 }
 
 void SettingsStore::reload()
@@ -150,6 +180,8 @@ void SettingsStore::reload()
     m_webSearchEnabled = settings.value("webSearchEnabled", true).toBool();
     m_exaSearchEnabled = settings.value("exaSearchEnabled", false).toBool();
     m_javaScriptUseEnabled = settings.value("javaScriptUseEnabled", false).toBool();
+    m_webBrowserEnabled = settings.value("webBrowserEnabled", false).toBool();
+    m_pageScreenshotsEnabled = settings.value("pageScreenshotsEnabled", false).toBool();
     emit openAIKeyChanged();
     emit openRouterKeyChanged();
     emit exaKeyChanged();
@@ -158,6 +190,8 @@ void SettingsStore::reload()
     emit webSearchEnabledChanged();
     emit exaSearchEnabledChanged();
     emit javaScriptUseEnabledChanged();
+    emit webBrowserEnabledChanged();
+    emit pageScreenshotsEnabledChanged();
 }
 
 } // namespace MyChatty

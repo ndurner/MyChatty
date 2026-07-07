@@ -23,6 +23,7 @@ public:
         BlocksRole,
         ToolCallsRole,
         ToolOnlyRole,
+        ApprovalRole,
     };
 
     explicit ChatMessageModel(QObject *parent = nullptr);

@@ -12,7 +12,10 @@
 #include <QFile>
 #include <QGuiApplication>
 #include <QJsonDocument>
+#include <QRegularExpression>
 #include <QStandardPaths>
+#include <QUrl>
+#include <QSet>
 #include <utility>
 
 namespace MyChatty {
@@ -63,6 +66,223 @@ static QJsonObject parseJsonObject(const QString &text)
 {
     const QJsonDocument doc = QJsonDocument::fromJson(text.toUtf8());
     return doc.isObject() ? doc.object() : QJsonObject{};
+}
+
+static QString imageDataUrl(const QString &path, const QString &mimeType)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    const QByteArray bytes = file.readAll();
+    if (bytes.isEmpty()) {
+        return {};
+    }
+    const QString type = mimeType.trimmed().isEmpty() ? QStringLiteral("image/png") : mimeType.trimmed();
+    return QStringLiteral("data:%1;base64,%2")
+        .arg(type, QString::fromLatin1(bytes.toBase64()));
+}
+
+static QJsonValue responsesFunctionOutput(const QJsonObject &output)
+{
+    const QString imagePath = output.value(QStringLiteral("image_path")).toString();
+    if (imagePath.isEmpty()) {
+        return QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact));
+    }
+
+    QJsonObject textObject = output;
+    textObject.remove(QStringLiteral("image_path"));
+    textObject.remove(QStringLiteral("image_mime_type"));
+    textObject.remove(QStringLiteral("image_detail"));
+
+    const QString dataUrl = imageDataUrl(imagePath, output.value(QStringLiteral("image_mime_type")).toString());
+    if (dataUrl.isEmpty()) {
+        return QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact));
+    }
+
+    return QJsonArray{
+        QJsonObject{
+            {QStringLiteral("type"), QStringLiteral("input_text")},
+            {QStringLiteral("text"), QString::fromUtf8(QJsonDocument(textObject).toJson(QJsonDocument::Compact))},
+        },
+        QJsonObject{
+            {QStringLiteral("type"), QStringLiteral("input_image")},
+            {QStringLiteral("image_url"), dataUrl},
+            {QStringLiteral("detail"), output.value(QStringLiteral("image_detail")).toString(QStringLiteral("high"))},
+        },
+    };
+}
+
+static QJsonValue chatToolOutput(const QJsonObject &output)
+{
+    const QString imagePath = output.value(QStringLiteral("image_path")).toString();
+    if (imagePath.isEmpty()) {
+        return QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact));
+    }
+
+    QJsonObject textObject = output;
+    textObject.remove(QStringLiteral("image_path"));
+    textObject.remove(QStringLiteral("image_mime_type"));
+    textObject.remove(QStringLiteral("image_detail"));
+
+    const QString dataUrl = imageDataUrl(imagePath, output.value(QStringLiteral("image_mime_type")).toString());
+    if (dataUrl.isEmpty()) {
+        return QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact));
+    }
+
+    return QJsonArray{
+        QJsonObject{
+            {QStringLiteral("type"), QStringLiteral("text")},
+            {QStringLiteral("text"), QString::fromUtf8(QJsonDocument(textObject).toJson(QJsonDocument::Compact))},
+        },
+        QJsonObject{
+            {QStringLiteral("type"), QStringLiteral("image_url")},
+            {QStringLiteral("image_url"), QJsonObject{{QStringLiteral("url"), dataUrl}}},
+        },
+    };
+}
+
+static bool isOpenWebPageCall(const QString &name)
+{
+    return name == QStringLiteral("open_web_page");
+}
+
+static QString hostForOpenWebPageArguments(const QJsonObject &arguments)
+{
+    return QUrl(arguments.value(QStringLiteral("url")).toString()).host().toLower();
+}
+
+static QString normalizedComparableUrl(const QString &text)
+{
+    QUrl url(text.trimmed());
+    if (!url.isValid() || (url.scheme() != QStringLiteral("http") && url.scheme() != QStringLiteral("https"))) {
+        return {};
+    }
+    url.setFragment({});
+    return url.adjusted(QUrl::NormalizePathSegments | QUrl::StripTrailingSlash).toString(QUrl::FullyEncoded);
+}
+
+static QString strippedUrlCandidate(QString text)
+{
+    text = text.trimmed();
+    while (!text.isEmpty() && QStringView(u".,;:!?)]}").contains(text.back())) {
+        text.chop(1);
+    }
+    return text;
+}
+
+static void addComparableUrl(QSet<QString> &urls, const QString &text)
+{
+    const QString normalized = normalizedComparableUrl(strippedUrlCandidate(text));
+    if (!normalized.isEmpty()) {
+        urls.insert(normalized);
+    }
+}
+
+static QSet<QString> userProvidedUrls(const QList<ChatMessage> &messages)
+{
+    QSet<QString> urls;
+    const QRegularExpression urlPattern(QStringLiteral(R"(\bhttps?://[^\s<>"']+)"));
+    for (const ChatMessage &message : messages) {
+        if (!message.isUser()) {
+            continue;
+        }
+        QRegularExpressionMatchIterator it = urlPattern.globalMatch(message.text);
+        while (it.hasNext()) {
+            addComparableUrl(urls, it.next().captured(0));
+        }
+    }
+    return urls;
+}
+
+static bool looksLikeUrlKey(const QString &key)
+{
+    const QString lower = key.toLower();
+    return lower == QStringLiteral("url")
+        || lower == QStringLiteral("uri")
+        || lower == QStringLiteral("link")
+        || lower == QStringLiteral("href")
+        || lower.endsWith(QStringLiteral("_url"));
+}
+
+static void collectUrlFields(const QJsonValue &value, QSet<QString> &urls)
+{
+    if (value.isArray()) {
+        for (const QJsonValue &entry : value.toArray()) {
+            collectUrlFields(entry, urls);
+        }
+        return;
+    }
+    if (!value.isObject()) {
+        return;
+    }
+    const QJsonObject object = value.toObject();
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        if (it.value().isString() && looksLikeUrlKey(it.key())) {
+            addComparableUrl(urls, it.value().toString());
+        } else if (it.value().isArray() || it.value().isObject()) {
+            collectUrlFields(it.value(), urls);
+        }
+    }
+}
+
+static bool isWebSearchLikeObject(const QJsonObject &object)
+{
+    const QString type = object.value(QStringLiteral("type")).toString();
+    const QString name = object.value(QStringLiteral("name")).toString();
+    const QString serverLabel = object.value(QStringLiteral("server_label")).toString();
+    return type.contains(QStringLiteral("web_search_call"))
+        || name == QStringLiteral("web_search")
+        || name == QStringLiteral("openrouter:web_search")
+        || name.contains(QStringLiteral("search"), Qt::CaseInsensitive)
+        || serverLabel == QStringLiteral("exa");
+}
+
+static void collectWebSearchUrls(const QJsonValue &value, QSet<QString> &urls)
+{
+    if (value.isArray()) {
+        for (const QJsonValue &entry : value.toArray()) {
+            collectWebSearchUrls(entry, urls);
+        }
+        return;
+    }
+    if (!value.isObject()) {
+        return;
+    }
+    const QJsonObject object = value.toObject();
+    if (isWebSearchLikeObject(object)) {
+        collectUrlFields(object, urls);
+        return;
+    }
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        collectWebSearchUrls(it.value(), urls);
+    }
+}
+
+static QSet<QString> webSearchResultUrls(const QList<ChatMessage> &messages)
+{
+    QSet<QString> urls;
+    for (const ChatMessage &message : messages) {
+        collectWebSearchUrls(message.rawOutputItems, urls);
+        collectWebSearchUrls(message.rawResponse, urls);
+        collectWebSearchUrls(message.toolIndicators, urls);
+    }
+    return urls;
+}
+
+static QString verifiedOpenWebPageProvenance(const QList<ChatMessage> &messages, const QJsonObject &arguments)
+{
+    const QString normalizedUrl = normalizedComparableUrl(arguments.value(QStringLiteral("url")).toString());
+    if (normalizedUrl.isEmpty()) {
+        return {};
+    }
+    if (userProvidedUrls(messages).contains(normalizedUrl)) {
+        return QStringLiteral("user_provided");
+    }
+    if (webSearchResultUrls(messages).contains(normalizedUrl)) {
+        return QStringLiteral("web_search_result");
+    }
+    return {};
 }
 
 static QString takeChunk(QString &buffer, int maxCharacters)
@@ -232,6 +452,8 @@ ChatRequest ChatController::makeRequest() const
     request.enableWebSearch = !m_settings || m_settings->webSearchEnabled();
     request.useExaSearch = m_settings && m_settings->exaSearchEnabled();
     request.enableJavaScriptUse = m_settings && m_settings->javaScriptUseEnabled();
+    request.enableWebBrowser = m_settings && m_settings->webBrowserEnabled();
+    request.enablePageScreenshots = m_settings && m_settings->pageScreenshotsEnabled();
     request.stream = true;
     return request;
 }
@@ -423,7 +645,11 @@ bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvide
             if (name.isEmpty() || callId.isEmpty()) {
                 continue;
             }
-            const QJsonObject output = executor.execute(name, parseJsonObject(item.value("arguments").toString()));
+            const QJsonObject arguments = parseJsonObject(item.value("arguments").toString());
+            if (requestWebApprovalIfNeeded(provider, toolDepth, callId, name, arguments)) {
+                return true;
+            }
+            const QJsonObject output = executor.execute(name, arguments);
 
             ChatMessage tool;
             tool.id = newId("msg");
@@ -432,7 +658,7 @@ bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvide
             tool.rawOutputItems = QJsonArray{QJsonObject{
                 {"type", "function_call_output"},
                 {"call_id", callId},
-                {"output", QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact))},
+                {"output", responsesFunctionOutput(output)},
             }};
             toolMessages.append(tool);
         }
@@ -448,7 +674,11 @@ bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvide
                 if (name.isEmpty() || id.isEmpty()) {
                     continue;
                 }
-                const QJsonObject output = executor.execute(name, parseJsonObject(function.value("arguments").toString()));
+                const QJsonObject arguments = parseJsonObject(function.value("arguments").toString());
+                if (requestWebApprovalIfNeeded(provider, toolDepth, id, name, arguments)) {
+                    return true;
+                }
+                const QJsonObject output = executor.execute(name, arguments);
 
                 ChatMessage tool;
                 tool.id = newId("msg");
@@ -457,7 +687,7 @@ bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvide
                 tool.rawOutputItems = QJsonArray{QJsonObject{
                     {"role", "tool"},
                     {"tool_call_id", id},
-                    {"content", QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact))},
+                    {"content", chatToolOutput(output)},
                 }};
                 toolMessages.append(tool);
             }
@@ -482,6 +712,77 @@ bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvide
 
     beginRequest(makeRequest(), assistantRow, toolDepth + 1);
     return true;
+}
+
+bool ChatController::requestWebApprovalIfNeeded(ApiProvider provider, int toolDepth, const QString &callId, const QString &name, const QJsonObject &arguments)
+{
+    if (!isOpenWebPageCall(name)) {
+        return false;
+    }
+    const QString verifiedProvenance = verifiedOpenWebPageProvenance(m_messages.messages(), arguments);
+    if (verifiedProvenance == QStringLiteral("user_provided")
+        || verifiedProvenance == QStringLiteral("web_search_result")) {
+        return false;
+    }
+    const QUrl url(arguments.value(QStringLiteral("url")).toString());
+    const QString host = url.host().toLower();
+    if (!host.isEmpty() && m_alwaysApprovedWebHosts.contains(host)) {
+        return false;
+    }
+    m_pendingToolApproval.active = true;
+    m_pendingToolApproval.approvalId = newId(QStringLiteral("approval"));
+    m_pendingToolApproval.provider = provider;
+    m_pendingToolApproval.toolDepth = toolDepth;
+    m_pendingToolApproval.callId = callId;
+    m_pendingToolApproval.name = name;
+    m_pendingToolApproval.arguments = arguments;
+
+    ChatMessage approvalMessage;
+    approvalMessage.id = newId("msg");
+    approvalMessage.role = "assistant";
+    approvalMessage.createdAt = QDateTime::currentDateTimeUtc();
+    approvalMessage.approval = QJsonObject{
+        {QStringLiteral("id"), m_pendingToolApproval.approvalId},
+        {QStringLiteral("type"), QStringLiteral("open_web_page")},
+        {QStringLiteral("status"), QStringLiteral("pending")},
+        {QStringLiteral("url"), url.toString()},
+        {QStringLiteral("host"), host},
+        {QStringLiteral("verified_provenance"), verifiedProvenance},
+    };
+    m_messages.append(approvalMessage);
+    setToast(QStringLiteral("Web Browser approval needed."));
+    return true;
+}
+
+void ChatController::appendToolOutputAndContinue(ApiProvider provider, int toolDepth, const QString &callId, const QJsonObject &output)
+{
+    ChatMessage tool;
+    tool.id = newId("msg");
+    tool.role = "assistant";
+    tool.createdAt = QDateTime::currentDateTimeUtc();
+    if (provider == ApiProvider::OpenAIResponses) {
+        tool.rawOutputItems = QJsonArray{QJsonObject{
+            {"type", "function_call_output"},
+            {"call_id", callId},
+            {"output", responsesFunctionOutput(output)},
+        }};
+    } else {
+        tool.rawOutputItems = QJsonArray{QJsonObject{
+            {"role", "tool"},
+            {"tool_call_id", callId},
+            {"content", chatToolOutput(output)},
+        }};
+    }
+    m_messages.append(tool);
+
+    ChatMessage assistant;
+    assistant.id = newId("msg");
+    assistant.role = "assistant";
+    assistant.createdAt = QDateTime::currentDateTimeUtc();
+    assistant.streaming = true;
+    m_messages.append(assistant);
+    const int assistantRow = m_messages.rowCount() - 1;
+    beginRequest(makeRequest(), assistantRow, toolDepth + 1);
 }
 
 void ChatController::attachFiles(const QVariant &urls, const QString &origin)
@@ -544,6 +845,47 @@ void ChatController::readAloud(int row)
     }
     const ChatMessage &message = m_messages.messages().at(row);
     m_speech.speak(message.text, m_settings ? m_settings->openAIKey() : QString());
+}
+
+void ChatController::resolveToolApproval(int row, const QString &decision)
+{
+    if (!m_pendingToolApproval.active || row < 0 || row >= m_messages.messages().size()) {
+        return;
+    }
+    ChatMessage message = m_messages.messages().at(row);
+    if (message.approval.value(QStringLiteral("id")).toString() != m_pendingToolApproval.approvalId) {
+        return;
+    }
+
+    const QString normalized = decision.trimmed().toLower();
+    const bool denied = normalized == QStringLiteral("no");
+    QJsonObject approval = message.approval;
+    approval[QStringLiteral("status")] = denied ? QStringLiteral("denied") : QStringLiteral("approved");
+    approval[QStringLiteral("decision")] = normalized;
+    message.approval = approval;
+    m_messages.update(row, message);
+
+    const PendingToolApproval pending = m_pendingToolApproval;
+    m_pendingToolApproval = {};
+
+    if (normalized == QStringLiteral("always")) {
+        const QString host = hostForOpenWebPageArguments(pending.arguments);
+        if (!host.isEmpty() && !m_alwaysApprovedWebHosts.contains(host)) {
+            m_alwaysApprovedWebHosts.append(host);
+        }
+    }
+
+    QJsonObject output;
+    if (denied) {
+        output = QJsonObject{
+            {QStringLiteral("success"), false},
+            {QStringLiteral("error"), QStringLiteral("User denied Web Browser access to this URL")},
+        };
+    } else {
+        ToolExecutor executor(m_settings, m_currentConversationId);
+        output = executor.execute(pending.name, pending.arguments);
+    }
+    appendToolOutputAndContinue(pending.provider, pending.toolDepth, pending.callId, output);
 }
 
 void ChatController::ensureCurrentConversationId()

@@ -14,6 +14,8 @@ class SettingsStore : public QObject {
     Q_PROPERTY(bool webSearchEnabled READ webSearchEnabled WRITE setWebSearchEnabled NOTIFY webSearchEnabledChanged)
     Q_PROPERTY(bool exaSearchEnabled READ exaSearchEnabled WRITE setExaSearchEnabled NOTIFY exaSearchEnabledChanged)
     Q_PROPERTY(bool javaScriptUseEnabled READ javaScriptUseEnabled WRITE setJavaScriptUseEnabled NOTIFY javaScriptUseEnabledChanged)
+    Q_PROPERTY(bool webBrowserEnabled READ webBrowserEnabled WRITE setWebBrowserEnabled NOTIFY webBrowserEnabledChanged)
+    Q_PROPERTY(bool pageScreenshotsEnabled READ pageScreenshotsEnabled WRITE setPageScreenshotsEnabled NOTIFY pageScreenshotsEnabledChanged)
 public:
     explicit SettingsStore(QObject *parent = nullptr);
 
@@ -25,6 +27,8 @@ public:
     bool webSearchEnabled() const;
     bool exaSearchEnabled() const;
     bool javaScriptUseEnabled() const;
+    bool webBrowserEnabled() const;
+    bool pageScreenshotsEnabled() const;
 
     void setOpenAIKey(const QString &value);
     void setOpenRouterKey(const QString &value);
@@ -34,6 +38,8 @@ public:
     void setWebSearchEnabled(bool value);
     void setExaSearchEnabled(bool value);
     void setJavaScriptUseEnabled(bool value);
+    void setWebBrowserEnabled(bool value);
+    void setPageScreenshotsEnabled(bool value);
 
     Q_INVOKABLE void save();
     Q_INVOKABLE void reload();
@@ -47,6 +53,8 @@ signals:
     void webSearchEnabledChanged();
     void exaSearchEnabledChanged();
     void javaScriptUseEnabledChanged();
+    void webBrowserEnabledChanged();
+    void pageScreenshotsEnabledChanged();
 
 private:
     QString m_openAIKey;
@@ -57,6 +65,8 @@ private:
     bool m_webSearchEnabled = true;
     bool m_exaSearchEnabled = false;
     bool m_javaScriptUseEnabled = false;
+    bool m_webBrowserEnabled = false;
+    bool m_pageScreenshotsEnabled = false;
 };
 
 } // namespace MyChatty

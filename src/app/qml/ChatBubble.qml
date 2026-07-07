@@ -14,6 +14,7 @@ Item {
     required property bool streaming
     required property var toolCalls
     required property bool toolOnly
+    required property var approval
     property var controller
 
     function hasUsefulReasoning(value) {
@@ -241,6 +242,67 @@ Item {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: root.approval && root.approval.type === "open_web_page"
+                width: parent.width
+                implicitHeight: approvalColumn.implicitHeight + 20
+                radius: 8
+                color: "#fff4d8"
+                border.color: "#ead79c"
+
+                Column {
+                    id: approvalColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 10
+                    spacing: 10
+
+                    Text {
+                        width: parent.width
+                        text: root.approval.status === "pending"
+                              ? "Allow Web Browser to open this URL?"
+                              : "Web Browser access " + root.approval.status
+                        color: "#4c3a00"
+                        font.pixelSize: 15
+                        font.weight: Font.DemiBold
+                        wrapMode: Text.Wrap
+                    }
+
+                    TextEdit {
+                        width: parent.width
+                        text: root.approval.url || ""
+                        textFormat: TextEdit.PlainText
+                        wrapMode: TextEdit.Wrap
+                        readOnly: true
+                        selectByMouse: true
+                        selectByKeyboard: true
+                        color: "#2d260f"
+                        font.pixelSize: 13
+                    }
+
+                    Row {
+                        visible: root.approval.status === "pending"
+                        spacing: 8
+                        Button {
+                            text: "Yes"
+                            onClicked: controller.resolveToolApproval(root.index, "yes")
+                            background: Rectangle { radius: 14; color: "#ffffff"; border.color: "#e0cc8f" }
+                        }
+                        Button {
+                            text: "No"
+                            onClicked: controller.resolveToolApproval(root.index, "no")
+                            background: Rectangle { radius: 14; color: "#ffffff"; border.color: "#e0cc8f" }
+                        }
+                        Button {
+                            text: "Always"
+                            onClicked: controller.resolveToolApproval(root.index, "always")
+                            background: Rectangle { radius: 14; color: "#ffffff"; border.color: "#e0cc8f" }
                         }
                     }
                 }

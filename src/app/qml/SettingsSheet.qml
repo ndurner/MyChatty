@@ -254,6 +254,42 @@ Popup {
                     }
 
                     Text {
+                        text: "Advanced Settings"
+                        color: "#969696"
+                        font.pixelSize: 21
+                        font.weight: Font.Bold
+                        leftPadding: 18
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 76
+                        radius: 26
+                        color: "#ffffff"
+                        Item {
+                            anchors.fill: parent
+                            anchors.leftMargin: 22
+                            anchors.rightMargin: 18
+                            Text {
+                                anchors.left: parent.left
+                                anchors.right: pageScreenshotsSwitch.left
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Page Screenshots"
+                                color: "#111111"
+                                font.pixelSize: 22
+                                elide: Text.ElideRight
+                            }
+                            Switch {
+                                id: pageScreenshotsSwitch
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                checked: store.pageScreenshotsEnabled
+                                onToggled: store.pageScreenshotsEnabled = checked
+                            }
+                        }
+                    }
+
+                    Text {
                         text: "Customize"
                         color: "#969696"
                         font.pixelSize: 21
