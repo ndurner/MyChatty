@@ -441,6 +441,11 @@ void ChatController::sendMessage(const QString &text)
     emit pendingAttachmentsChanged();
     m_messages.append(user);
 
+    appendAssistantAndBeginRequest();
+}
+
+void ChatController::appendAssistantAndBeginRequest()
+{
     ChatMessage assistant;
     assistant.id = newId("msg");
     assistant.role = "assistant";
@@ -849,6 +854,66 @@ void ChatController::copyMessage(int row)
     }
     QGuiApplication::clipboard()->setText(m_messages.messages().at(row).text);
     setToast(QStringLiteral("Copied."));
+}
+
+void ChatController::amendUserMessage(int row, const QString &text)
+{
+    if (m_busy || row < 0 || row >= m_messages.messages().size()) {
+        return;
+    }
+
+    ChatMessage message = m_messages.messages().at(row);
+    if (!message.isUser()) {
+        return;
+    }
+
+    const QString trimmed = text.trimmed();
+    if (trimmed.isEmpty() && message.attachments.isEmpty()) {
+        return;
+    }
+
+    message.text = trimmed;
+    message.createdAt = QDateTime::currentDateTimeUtc();
+    m_messages.update(row, message);
+    m_messages.removeAfter(row);
+    m_pendingAttachments.clear();
+    emit pendingAttachmentsChanged();
+
+    ensureCurrentConversationId();
+    appendAssistantAndBeginRequest();
+}
+
+void ChatController::forkConversation(int row)
+{
+    if (m_busy && m_client) {
+        m_client->cancel();
+    }
+    resetStreamBuffer();
+    setBusy(false);
+
+    const QList<ChatMessage> currentMessages = m_messages.messages();
+    if (currentMessages.isEmpty()) {
+        return;
+    }
+
+    const int lastRow = row >= 0 && row < currentMessages.size() ? row : currentMessages.size() - 1;
+    QList<ChatMessage> forkedMessages;
+    forkedMessages.reserve(lastRow + 1);
+    for (int i = 0; i <= lastRow; ++i) {
+        forkedMessages.append(currentMessages.at(i));
+    }
+
+    const QString previousConversationId = m_currentConversationId;
+    m_currentConversationId = newId("conv");
+    m_messages.setMessages(forkedMessages);
+    m_pendingAttachments.clear();
+    emit pendingAttachmentsChanged();
+    persistCurrentConversation();
+
+    setToast(QStringLiteral("Forked chat."));
+    if (!previousConversationId.isEmpty()) {
+        refreshRecents();
+    }
 }
 
 void ChatController::shareMessage(int)

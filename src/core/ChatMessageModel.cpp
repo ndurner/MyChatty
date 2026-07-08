@@ -283,6 +283,18 @@ void ChatMessageModel::update(int row, const ChatMessage &message)
     emit dataChanged(idx, idx);
 }
 
+void ChatMessageModel::removeAfter(int row)
+{
+    if (row < -1 || row >= m_messages.size() - 1) {
+        return;
+    }
+    const int first = row + 1;
+    const int last = m_messages.size() - 1;
+    beginRemoveRows({}, first, last);
+    m_messages.erase(m_messages.begin() + first, m_messages.end());
+    endRemoveRows();
+}
+
 void ChatMessageModel::clear()
 {
     beginResetModel();

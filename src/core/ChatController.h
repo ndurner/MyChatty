@@ -53,6 +53,8 @@ public:
     Q_INVOKABLE void attachFiles(const QVariant &urls, const QString &origin);
     Q_INVOKABLE void removePendingAttachment(const QString &id);
     Q_INVOKABLE void copyMessage(int row);
+    Q_INVOKABLE void amendUserMessage(int row, const QString &text);
+    Q_INVOKABLE void forkConversation(int row);
     Q_INVOKABLE void shareMessage(int row);
     Q_INVOKABLE void readAloud(int row);
     Q_INVOKABLE void resolveToolApproval(int row, const QString &decision);
@@ -75,6 +77,7 @@ private:
     void setBusy(bool value);
     void setToast(const QString &message);
     ChatRequest makeRequest() const;
+    void appendAssistantAndBeginRequest();
     void beginRequest(const ChatRequest &request, int assistantRow, int toolDepth);
     bool continueAfterToolCalls(const ChatResult &result, ApiProvider provider, int toolDepth);
     bool requestWebApprovalIfNeeded(ApiProvider provider, int toolDepth, const QString &callId, const QString &name, const QJsonObject &arguments);

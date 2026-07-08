@@ -18,6 +18,12 @@ without duplicating request serialization or streaming parsing code.
 
 - Qt Quick chat UI with a start screen, sidebar recents, settings sheet,
   model/effort selector, attachment menu, and assistant action buttons.
+- Conversation branching: assistant messages expose a `Fork` action that starts
+  a new conversation with the same history up to that response.
+- User message actions: copy or edit user bubbles from the long-press menu, or
+  from hover buttons on desktop. Editing a user message truncates later
+  assistant responses and regenerates from the amended message with the
+  currently selected model and effort.
 - Markdown rendering for assistant messages, including bold text, code fences,
   tables, links, and bare URLs.
 - Streaming OpenAI Responses API client in `OpenaiResponsesAPI`.
@@ -268,6 +274,11 @@ in `THIRD_PARTY_NOTICES.md`.
 
 Conversations are stored via `QStandardPaths::AppDataLocation` in
 `conversations.json`, capped to the 100 most recent conversations.
+
+Forking a conversation writes a new conversation record with a fresh id and the
+same message history up to the selected assistant response. Editing a user
+message mutates the active conversation: messages after the edited user message
+are removed before the replacement assistant response is appended.
 
 The Share action writes a JSON file into the user's Documents directory. The
 export is intentionally close to the historical `oai_chat` format:

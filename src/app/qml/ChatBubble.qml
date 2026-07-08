@@ -16,6 +16,7 @@ Item {
     required property bool toolOnly
     required property var approval
     property var controller
+    signal editRequested(int row, string text)
 
     function hasUsefulReasoning(value) {
         var text = (value || "").trim()
@@ -76,25 +77,99 @@ Item {
             }
         }
 
-        Rectangle {
+        Item {
+            id: userMessageWrap
             visible: root.isUser
-            anchors.right: parent.right
-            width: Math.min(userText.implicitWidth + 42, parent.width * 0.78)
-            height: userText.implicitHeight + 30
-            radius: 26
-            color: "#000000"
-            TextEdit {
-                id: userText
-                anchors.fill: parent
-                anchors.margins: 17
-                text: root.text
-                textFormat: TextEdit.PlainText
-                wrapMode: TextEdit.Wrap
-                readOnly: true
-                selectByMouse: true
-                selectByKeyboard: true
-                color: "#ffffff"
-                font.pixelSize: 20
+            width: parent.width
+            implicitHeight: userBubble.height + (userHover.hovered ? userActions.height + 6 : 0)
+
+            HoverHandler {
+                id: userHover
+            }
+
+            TapHandler {
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                gesturePolicy: TapHandler.WithinBounds
+                onLongPressed: userMenu.popup()
+            }
+
+            Menu {
+                id: userMenu
+                MenuItem {
+                    text: "Copy"
+                    onTriggered: controller.copyMessage(root.index)
+                }
+                MenuItem {
+                    text: "Edit"
+                    enabled: !controller.busy
+                    onTriggered: root.editRequested(root.index, root.text)
+                }
+            }
+
+            Rectangle {
+                id: userBubble
+                anchors.right: parent.right
+                width: Math.min(userText.implicitWidth + 42, parent.width * 0.78)
+                height: userText.implicitHeight + 30
+                radius: 26
+                color: "#000000"
+
+                TextEdit {
+                    id: userText
+                    anchors.fill: parent
+                    anchors.margins: 17
+                    text: root.text
+                    textFormat: TextEdit.PlainText
+                    wrapMode: TextEdit.Wrap
+                    readOnly: true
+                    selectByMouse: true
+                    selectByKeyboard: true
+                    color: "#ffffff"
+                    font.pixelSize: 20
+                }
+            }
+
+            Row {
+                id: userActions
+                visible: userHover.hovered || userMenu.visible
+                anchors.top: userBubble.bottom
+                anchors.topMargin: 6
+                anchors.right: userBubble.right
+                height: 30
+                spacing: 8
+
+                Button {
+                    width: 58
+                    height: 30
+                    text: "Copy"
+                    padding: 0
+                    onClicked: controller.copyMessage(root.index)
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#666666"
+                        font.pixelSize: 13
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle { radius: 8; color: "#f1f1f1" }
+                }
+
+                Button {
+                    width: 54
+                    height: 30
+                    text: "Edit"
+                    padding: 0
+                    enabled: !controller.busy
+                    onClicked: root.editRequested(root.index, root.text)
+                    contentItem: Text {
+                        text: parent.text
+                        color: parent.enabled ? "#666666" : "#aaaaaa"
+                        font.pixelSize: 13
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle { radius: 8; color: "#f1f1f1" }
+                }
             }
         }
 
@@ -368,6 +443,18 @@ Item {
                 Button {
                     text: "Share"
                     onClicked: controller.shareMessage(root.index)
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#666666"
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle { radius: 14; color: "#f1f1f1" }
+                }
+                Button {
+                    text: "Fork"
+                    onClicked: controller.forkConversation(root.index)
                     contentItem: Text {
                         text: parent.text
                         color: "#666666"

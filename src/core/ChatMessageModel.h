@@ -37,6 +37,7 @@ public:
     void setMessages(const QList<ChatMessage> &messages);
     void append(const ChatMessage &message);
     void update(int row, const ChatMessage &message);
+    void removeAfter(int row);
     void clear();
 
 private:

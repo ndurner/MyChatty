@@ -104,6 +104,9 @@ ApplicationWindow {
         model: chatController.messages
         delegate: ChatBubble {
             controller: chatController
+            onEditRequested: function(row, text) {
+                composer.startEdit(row, text)
+            }
         }
     }
 
@@ -132,6 +135,7 @@ ApplicationWindow {
             width: parent.width
             controller: chatController
             onAddClicked: attachmentMenu.open()
+            onModelClicked: selector.open()
         }
     }
 
