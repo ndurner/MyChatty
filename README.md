@@ -21,11 +21,14 @@ without duplicating request serialization or streaming parsing code.
 - Markdown rendering for assistant messages, including bold text, code fences,
   tables, links, and bare URLs.
 - Streaming OpenAI Responses API client in `OpenaiResponsesAPI`.
-- Streaming OpenRouter chat-completions client in `OpenaiChatAPI`.
-- Model catalog entries for GPT-5.5, GPT-5.4 mini, GPT-5.5 Pro, GLM-5.2,
-  Kimi K2.6, and a free Gemma test model.
+- Streaming OpenAI-compatible chat-completions client in `OpenaiChatAPI` for
+  OpenRouter and NVIDIA NIM.
+- Two-level provider/model selector for OpenAI, OpenRouter, and NVIDIA.
+- Model catalog entries for GPT-5.5, GPT-5.4 mini, GPT-5.5 Pro, OpenRouter
+  models, and live-tested NVIDIA NIM models.
 - OpenRouter provider pinning for GLM-5.2 and Kimi K2.6.
-- Settings for OpenAI and OpenRouter API keys plus Custom instructions.
+- Settings for OpenAI, OpenRouter, NVIDIA, and Exa API keys plus Custom
+  instructions.
 - Web search settings for provider-backed search and optional
   [Exa](https://exa.ai/) search.
 - Optional Code Interpreter plugin for local JavaScript evaluation.
@@ -66,6 +69,7 @@ The main build targets are:
 - API keys for live provider calls:
   - `OPENAI_API_KEY` for OpenAI Responses and text-to-speech.
   - `OPENROUTER_API_KEY` for OpenRouter.
+  - `NVIDIA_API_KEY` for NVIDIA NIM.
   - `EXA_API_KEY` for OpenAI Exa MCP calls when using a private Exa key.
 
 The app stores keys in `QSettings` through the Settings sheet. The CLI reads
@@ -132,6 +136,11 @@ The CLI sends requests through the same provider classes as the app.
   --provider openrouter \
   --model google/gemma-4-26b-a4b-it:free \
   --prompt "Reply with one sentence."
+
+./build/bin/mychatty-cli \
+  --provider nvidia \
+  --model openai/gpt-oss-20b \
+  --prompt "Reply with one sentence."
 ```
 
 Use `--dry-run` to inspect the JSON payload without making a network request:
@@ -154,6 +163,7 @@ Useful options:
   provider/default search path.
 - `--json`: prints text, reasoning, raw output items, raw response, raw events,
   and usage as JSON.
+- `--no-stream`: disables streaming for chat-completions providers.
 - `--no-cache`: bypasses the CLI response cache.
 - `--code-interpreter`: advertises the local JavaScript tool in CLI requests.
 
@@ -199,9 +209,15 @@ OpenRouter calls use the chat completions endpoint:
 https://openrouter.ai/api/v1/chat/completions
 ```
 
+NVIDIA calls use the NVIDIA NIM chat completions endpoint:
+
+```text
+https://integrate.api.nvidia.com/v1/chat/completions
+```
+
 This split is reflected in the code names: `OpenaiResponsesAPI` for OpenAI's
 Responses API and `OpenaiChatAPI` for the OpenAI-compatible chat-completions
-schema used by OpenRouter.
+schema used by OpenRouter and NVIDIA.
 
 The built-in model catalog currently contains:
 
@@ -210,9 +226,20 @@ The built-in model catalog currently contains:
 | GPT-5.5 | `gpt-5.5` | OpenAI Responses | |
 | GPT-5.4 mini | `gpt-5.4-mini` | OpenAI Responses | |
 | GPT-5.5 Pro | `gpt-5.5-pro` | OpenAI Responses | |
+| GPT-5.5 | `openai/gpt-5.5` | OpenRouter | |
+| GPT-5.4 mini | `openai/gpt-5.4-mini` | OpenRouter | |
+| GPT-5.5 Pro | `openai/gpt-5.5-pro` | OpenRouter | |
 | GLM-5.2 | `z-ai/glm-5.2` | OpenRouter | Parasail |
 | Kimi K2.6 | `moonshotai/kimi-k2.6` | OpenRouter | Moonshot AI |
+| Gemini 3.5 Flash | `google/gemini-3.5-flash` | OpenRouter | |
+| Gemini Flash Lite | `google/gemini-3.1-flash-lite` | OpenRouter | |
+| Gemini Pro Latest | `~google/gemini-pro-latest` | OpenRouter | |
+| GPT OSS 20B | `openai/gpt-oss-20b` | OpenRouter | |
 | Gemma 4 Free | `google/gemma-4-26b-a4b-it:free` | OpenRouter | |
+| GLM-5.2 | `z-ai/glm-5.2` | NVIDIA | |
+| Nemotron 3 Ultra | `nvidia/nemotron-3-ultra-550b-a55b` | NVIDIA | |
+| GPT OSS 20B | `openai/gpt-oss-20b` | NVIDIA | |
+| GPT OSS 120B | `openai/gpt-oss-120b` | NVIDIA | |
 
 Web search is controlled by the `Web Search` plugin in the `+` attachment menu
 and the `Use Exa` switch in Settings. `Web Search` is enabled by default. When

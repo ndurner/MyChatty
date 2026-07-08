@@ -492,7 +492,9 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
 {
     QJsonArray messages;
     QString systemInstructions = request.customInstructions.trimmed();
-    if (request.enableWebSearch) {
+    const bool openRouter = request.model.provider == ApiProvider::OpenRouterChat;
+    const bool nvidia = request.model.provider == ApiProvider::NvidiaChat;
+    if (request.enableWebSearch && openRouter) {
         const QString webInstruction = QStringLiteral("Web search is available through the openrouter:web_search server tool. Use it for current facts, public people, organizations, news, prices, schedules, and other information that may be outside the model's training data.");
         systemInstructions = systemInstructions.isEmpty()
             ? webInstruction
@@ -527,20 +529,31 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
         {"model", request.model.apiModel},
         {"messages", messages},
         {"stream", request.stream},
-        {"reasoning", QJsonObject{
+    };
+    if (openRouter) {
+        body["reasoning"] = QJsonObject{
             {"effort", ModelCatalog::openRouterReasoningEffort(request.effort)},
             {"exclude", false},
-        }},
-    };
+        };
+    }
+    for (auto it = request.model.chatParameters.constBegin(); it != request.model.chatParameters.constEnd(); ++it) {
+        body[it.key()] = it.value();
+    }
     if (request.maxOutputTokens > 0) {
         body["max_tokens"] = request.maxOutputTokens;
     }
-    if (request.enableWebSearch) {
+    if (nvidia && request.model.apiModel == QStringLiteral("nvidia/nemotron-3-ultra-550b-a55b")
+        && request.effort.trimmed().compare(QStringLiteral("Medium"), Qt::CaseInsensitive) == 0) {
+        QJsonObject kwargs = body.value(QStringLiteral("chat_template_kwargs")).toObject();
+        kwargs[QStringLiteral("medium_effort")] = true;
+        body[QStringLiteral("chat_template_kwargs")] = kwargs;
+    }
+    if (request.enableWebSearch && openRouter) {
         QJsonArray tools = body.value("tools").toArray();
         tools.append(openRouterWebSearchTool(request.useExaSearch));
         body["tools"] = tools;
     }
-    if (hasPdfAttachments(request.history)) {
+    if (hasPdfAttachments(request.history) && openRouter) {
         QJsonArray plugins = body.value("plugins").toArray();
         const QString engine = request.openRouterPdfEngine == QStringLiteral("native")
             ? QStringLiteral("native")
@@ -563,7 +576,7 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
         }
         body["tools"] = tools;
     }
-    if (!request.model.providerOnly.isEmpty()) {
+    if (!request.model.providerOnly.isEmpty() && openRouter) {
         QJsonArray providers;
         for (const QString &provider : request.model.providerOnly) {
             providers.append(provider);

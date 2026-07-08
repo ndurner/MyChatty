@@ -18,6 +18,7 @@ static QJsonObject conversationToJson(const Conversation &conversation)
     return {
         {"id", conversation.id},
         {"title", conversation.title},
+        {"provider", conversation.provider},
         {"model", conversation.model},
         {"effort", conversation.effort},
         {"createdAt", conversation.createdAt.toUTC().toString(Qt::ISODateWithMs)},
@@ -31,7 +32,11 @@ static Conversation conversationFromJson(const QJsonObject &object)
     Conversation conversation;
     conversation.id = object.value("id").toString(newId("conv"));
     conversation.title = object.value("title").toString("New chat");
+    conversation.provider = object.value("provider").toString();
     conversation.model = object.value("model").toString("Gemma 4 Free");
+    if (conversation.provider.isEmpty()) {
+        conversation.provider = ModelCatalog::modelForDisplayName(conversation.model).providerLabel;
+    }
     conversation.effort = object.value("effort").toString("Medium");
     conversation.createdAt = QDateTime::fromString(object.value("createdAt").toString(), Qt::ISODateWithMs);
     conversation.updatedAt = QDateTime::fromString(object.value("updatedAt").toString(), Qt::ISODateWithMs);

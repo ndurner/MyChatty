@@ -64,6 +64,19 @@ private slots:
         QCOMPARE(gptOss.apiModel, QString("openai/gpt-oss-20b"));
         QCOMPARE(gptOss.provider, ApiProvider::OpenRouterChat);
         QVERIFY(gptOss.providerOnly.isEmpty());
+
+        const ModelInfo nvidiaGlm = ModelCatalog::modelForProviderAndDisplayName("NVIDIA", "GLM-5.2");
+        QCOMPARE(nvidiaGlm.apiModel, QString("z-ai/glm-5.2"));
+        QCOMPARE(nvidiaGlm.provider, ApiProvider::NvidiaChat);
+        QCOMPARE(nvidiaGlm.chatParameters.value("temperature").toInt(), 1);
+        QCOMPARE(nvidiaGlm.chatParameters.value("top_p").toInt(), 1);
+        QCOMPARE(nvidiaGlm.chatParameters.value("max_tokens").toInt(), 16384);
+        QVERIFY(!nvidiaGlm.chatParameters.contains("seed"));
+
+        const ModelInfo nvidiaGptOss = ModelCatalog::modelForProviderAndDisplayName("NVIDIA", "GPT OSS 120B");
+        QCOMPARE(nvidiaGptOss.apiModel, QString("openai/gpt-oss-120b"));
+        QCOMPARE(nvidiaGptOss.provider, ApiProvider::NvidiaChat);
+        QCOMPARE(nvidiaGptOss.chatParameters.value("max_tokens").toInt(), 4096);
     }
 
     void openRouterPayloadPinsParasailForGlm()
@@ -88,8 +101,18 @@ private slots:
     {
         ChatController controller(nullptr);
         QCOMPARE(controller.selectedModel(), QString("Gemma 4 Free"));
+        QCOMPARE(controller.selectedProvider(), QString("OpenRouter"));
         QCOMPARE(ModelCatalog::modelForDisplayName(controller.selectedModel()).provider,
                  ApiProvider::OpenRouterChat);
+    }
+
+    void chatControllerSwitchesProviderModelList()
+    {
+        ChatController controller(nullptr);
+        controller.setSelectedProvider("NVIDIA");
+        QCOMPARE(controller.selectedProvider(), QString("NVIDIA"));
+        QCOMPARE(controller.selectedModel(), QString("GLM-5.2"));
+        QCOMPARE(controller.modelOptions().first().toMap().value("provider").toString(), QString("NVIDIA"));
     }
 
     void responsesPayloadUsesResponsesShape()
@@ -179,6 +202,38 @@ private slots:
         tool = payload.value("tools").toArray().first().toObject();
         QCOMPARE(tool.value("parameters").toObject().value("engine").toString(), QString("exa"));
         QCOMPARE(tool.value("parameters").toObject().value("search_context_size").toString(), QString("medium"));
+    }
+
+    void nvidiaPayloadUsesChatCompletionsExtensions()
+    {
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "hello";
+        ChatRequest request;
+        request.history = {user};
+        request.model = ModelCatalog::modelForProviderAndDisplayName("NVIDIA", "Nemotron 3 Ultra 550B A55B");
+        request.effort = "Medium";
+        request.maxOutputTokens = 128;
+
+        QJsonObject payload = buildOpenaiChatPayload(request);
+        QCOMPARE(payload.value("model").toString(), QString("nvidia/nemotron-3-ultra-550b-a55b"));
+        QVERIFY(!payload.contains("reasoning"));
+        QCOMPARE(payload.value("temperature").toInt(), 1);
+        QCOMPARE(payload.value("top_p").toDouble(), 0.95);
+        QCOMPARE(payload.value("max_tokens").toInt(), 128);
+        QCOMPARE(payload.value("reasoning_budget").toInt(), 16384);
+        const QJsonObject kwargs = payload.value("chat_template_kwargs").toObject();
+        QCOMPARE(kwargs.value("enable_thinking").toBool(), true);
+        QCOMPARE(kwargs.value("force_nonempty_content").toBool(), true);
+        QCOMPARE(kwargs.value("medium_effort").toBool(), true);
+
+        request.model = ModelCatalog::modelForProviderAndDisplayName("NVIDIA", "GPT OSS 20B");
+        request.maxOutputTokens = 0;
+        payload = buildOpenaiChatPayload(request);
+        QCOMPARE(payload.value("temperature").toInt(), 1);
+        QCOMPARE(payload.value("top_p").toInt(), 1);
+        QCOMPARE(payload.value("max_tokens").toInt(), 4096);
     }
 
     void openRouterPayloadAddsPdfFileParser()

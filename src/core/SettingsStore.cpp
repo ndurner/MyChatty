@@ -20,6 +20,11 @@ QString SettingsStore::openRouterKey() const
     return m_openRouterKey;
 }
 
+QString SettingsStore::nvidiaKey() const
+{
+    return m_nvidiaKey;
+}
+
 QString SettingsStore::exaKey() const
 {
     return m_exaKey;
@@ -76,6 +81,15 @@ void SettingsStore::setOpenRouterKey(const QString &value)
     }
     m_openRouterKey = value;
     emit openRouterKeyChanged();
+}
+
+void SettingsStore::setNvidiaKey(const QString &value)
+{
+    if (m_nvidiaKey == value) {
+        return;
+    }
+    m_nvidiaKey = value;
+    emit nvidiaKeyChanged();
 }
 
 void SettingsStore::setExaKey(const QString &value)
@@ -156,6 +170,7 @@ void SettingsStore::save()
     QSettings settings;
     settings.setValue("openAIKey", m_openAIKey);
     settings.setValue("openRouterKey", m_openRouterKey);
+    settings.setValue("nvidiaKey", m_nvidiaKey);
     settings.setValue("exaKey", m_exaKey);
     settings.setValue("openRouterPdfEngine", m_openRouterPdfEngine);
     settings.setValue("customInstructions", m_customInstructions);
@@ -171,6 +186,7 @@ void SettingsStore::reload()
     QSettings settings;
     m_openAIKey = settings.value("openAIKey").toString();
     m_openRouterKey = settings.value("openRouterKey").toString();
+    m_nvidiaKey = settings.value("nvidiaKey").toString();
     m_exaKey = settings.value("exaKey").toString();
     m_openRouterPdfEngine = settings.value("openRouterPdfEngine", QStringLiteral("cloudflare-ai")).toString();
     if (m_openRouterPdfEngine != QStringLiteral("native")) {
@@ -184,6 +200,7 @@ void SettingsStore::reload()
     m_pageScreenshotsEnabled = settings.value("pageScreenshotsEnabled", false).toBool();
     emit openAIKeyChanged();
     emit openRouterKeyChanged();
+    emit nvidiaKeyChanged();
     emit exaKeyChanged();
     emit openRouterPdfEngineChanged();
     emit customInstructionsChanged();

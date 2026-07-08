@@ -10,6 +10,7 @@ namespace MyChatty {
 struct Conversation {
     QString id;
     QString title;
+    QString provider;
     QString model;
     QString effort;
     QDateTime createdAt;

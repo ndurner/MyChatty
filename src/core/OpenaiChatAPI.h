@@ -27,6 +27,7 @@ private:
     QJsonArray m_reasoningDetails;
     QMap<int, QJsonObject> m_toolCalls;
     bool m_done = false;
+    bool m_stream = true;
 };
 
 } // namespace MyChatty

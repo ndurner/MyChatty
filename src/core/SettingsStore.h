@@ -8,6 +8,7 @@ class SettingsStore : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString openAIKey READ openAIKey WRITE setOpenAIKey NOTIFY openAIKeyChanged)
     Q_PROPERTY(QString openRouterKey READ openRouterKey WRITE setOpenRouterKey NOTIFY openRouterKeyChanged)
+    Q_PROPERTY(QString nvidiaKey READ nvidiaKey WRITE setNvidiaKey NOTIFY nvidiaKeyChanged)
     Q_PROPERTY(QString exaKey READ exaKey WRITE setExaKey NOTIFY exaKeyChanged)
     Q_PROPERTY(QString openRouterPdfEngine READ openRouterPdfEngine WRITE setOpenRouterPdfEngine NOTIFY openRouterPdfEngineChanged)
     Q_PROPERTY(QString customInstructions READ customInstructions WRITE setCustomInstructions NOTIFY customInstructionsChanged)
@@ -21,6 +22,7 @@ public:
 
     QString openAIKey() const;
     QString openRouterKey() const;
+    QString nvidiaKey() const;
     QString exaKey() const;
     QString openRouterPdfEngine() const;
     QString customInstructions() const;
@@ -32,6 +34,7 @@ public:
 
     void setOpenAIKey(const QString &value);
     void setOpenRouterKey(const QString &value);
+    void setNvidiaKey(const QString &value);
     void setExaKey(const QString &value);
     void setOpenRouterPdfEngine(const QString &value);
     void setCustomInstructions(const QString &value);
@@ -47,6 +50,7 @@ public:
 signals:
     void openAIKeyChanged();
     void openRouterKeyChanged();
+    void nvidiaKeyChanged();
     void exaKeyChanged();
     void openRouterPdfEngineChanged();
     void customInstructionsChanged();
@@ -59,6 +63,7 @@ signals:
 private:
     QString m_openAIKey;
     QString m_openRouterKey;
+    QString m_nvidiaKey;
     QString m_exaKey;
     QString m_openRouterPdfEngine = QStringLiteral("cloudflare-ai");
     QString m_customInstructions;

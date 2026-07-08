@@ -117,7 +117,7 @@ Popup {
                     }
                     Rectangle {
                         width: parent.width
-                        height: 328
+                        height: 420
                         radius: 26
                         color: "#ffffff"
                         Column {
@@ -135,6 +135,12 @@ Popup {
                                 label: "OpenRouter API Key"
                                 text: store.openRouterKey
                                 onEdited: store.openRouterKey = text
+                            }
+                            LabeledSecretField {
+                                width: parent.width
+                                label: "NVIDIA API Key"
+                                text: store.nvidiaKey
+                                onEdited: store.nvidiaKey = text
                             }
                             LabeledSecretField {
                                 width: parent.width

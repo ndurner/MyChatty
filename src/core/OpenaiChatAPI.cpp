@@ -18,10 +18,17 @@ void OpenaiChatAPI::send(const ChatRequest &request)
     m_responseBody.clear();
     m_reasoningDetails = {};
     m_toolCalls.clear();
+    m_stream = request.stream;
 
-    QNetworkRequest networkRequest = jsonRequest(QUrl("https://openrouter.ai/api/v1/chat/completions"), request.apiKey);
-    networkRequest.setRawHeader("HTTP-Referer", "https://github.com/ndurner/MyChatty");
-    networkRequest.setRawHeader("X-Title", "MyChatty");
+    const bool nvidia = request.model.provider == ApiProvider::NvidiaChat;
+    QNetworkRequest networkRequest = jsonRequest(
+        QUrl(nvidia ? QStringLiteral("https://integrate.api.nvidia.com/v1/chat/completions")
+                   : QStringLiteral("https://openrouter.ai/api/v1/chat/completions")),
+        request.apiKey);
+    if (!nvidia) {
+        networkRequest.setRawHeader("HTTP-Referer", "https://github.com/ndurner/MyChatty");
+        networkRequest.setRawHeader("X-Title", "MyChatty");
+    }
 
     const QByteArray body = QJsonDocument(buildOpenaiChatPayload(request)).toJson(QJsonDocument::Compact);
     m_reply = m_network.post(networkRequest, body);
@@ -32,10 +39,12 @@ void OpenaiChatAPI::send(const ChatRequest &request)
         }
         const QByteArray chunk = m_reply->readAll();
         m_responseBody.append(chunk);
-        if (m_responseBody.size() > 4096) {
+        if (m_stream && m_responseBody.size() > 4096) {
             m_responseBody.truncate(4096);
         }
-        m_parser.feed(chunk);
+        if (m_stream) {
+            m_parser.feed(chunk);
+        }
     });
     connect(m_reply, &QNetworkReply::finished, this, &OpenaiChatAPI::finishFromReply);
 }
@@ -58,7 +67,7 @@ void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
         const QJsonObject error = object.value("error").toObject();
         QString message = error.value("metadata").toObject().value("raw").toString();
         if (message.isEmpty()) {
-            message = error.value("message").toString(QStringLiteral("OpenRouter request failed"));
+            message = error.value("message").toString(QStringLiteral("Chat completions request failed"));
         }
         m_done = true;
         emit failed(message);
@@ -78,7 +87,7 @@ void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
             m_result.text += content;
             emit textDelta(content);
         }
-        const QString reasoning = delta.value("reasoning").toString();
+        const QString reasoning = delta.value("reasoning").toString(delta.value("reasoning_content").toString());
         if (!reasoning.isEmpty()) {
             m_result.reasoning += reasoning;
             emit reasoningDelta(reasoning);
@@ -121,15 +130,19 @@ void OpenaiChatAPI::finishFromReply()
     if (!m_reply) {
         return;
     }
-    m_parser.finish();
+    if (m_stream) {
+        m_parser.finish();
+    }
     const QByteArray rest = m_reply->readAll();
     if (!rest.isEmpty()) {
         m_responseBody.append(rest);
-        if (m_responseBody.size() > 4096) {
+        if (m_stream && m_responseBody.size() > 4096) {
             m_responseBody.truncate(4096);
         }
-        m_parser.feed(rest);
-        m_parser.finish();
+        if (m_stream) {
+            m_parser.feed(rest);
+            m_parser.finish();
+        }
     }
 
     if (m_reply->error() != QNetworkReply::NoError && !m_done) {
@@ -138,6 +151,48 @@ void OpenaiChatAPI::finishFromReply()
         return;
     }
 
+    if (!m_stream && !m_done) {
+        const QJsonDocument doc = QJsonDocument::fromJson(m_responseBody);
+        const QJsonObject object = doc.object();
+        if (object.contains("error")) {
+            const QJsonObject error = object.value("error").toObject();
+            QString message = error.value("metadata").toObject().value("raw").toString();
+            if (message.isEmpty()) {
+                message = error.value("message").toString(QStringLiteral("Chat completions request failed"));
+            }
+            m_done = true;
+            emit failed(message);
+            m_reply->deleteLater();
+            return;
+        }
+        m_result.rawResponse = object;
+        m_result.usage = object.value("usage").toObject();
+        const QJsonArray choices = object.value("choices").toArray();
+        for (const QJsonValue &choiceValue : choices) {
+            const QJsonObject message = choiceValue.toObject().value("message").toObject();
+            const QString reasoning = message.value("reasoning_content").toString(message.value("reasoning").toString());
+            if (!reasoning.isEmpty()) {
+                m_result.reasoning += reasoning;
+                emit reasoningDelta(reasoning);
+            }
+            const QString content = message.value("content").toString();
+            if (!content.isEmpty()) {
+                m_result.text += content;
+                emit textDelta(content);
+            }
+            if (message.contains("tool_calls")) {
+                QJsonObject assistant{
+                    {"role", "assistant"},
+                    {"content", content},
+                    {"tool_calls", message.value("tool_calls").toArray()},
+                };
+                if (!reasoning.isEmpty()) {
+                    assistant["reasoning"] = reasoning;
+                }
+                m_result.rawOutputItems.append(assistant);
+            }
+        }
+    }
     completeIfNeeded();
     m_reply->deleteLater();
 }

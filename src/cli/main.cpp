@@ -61,6 +61,22 @@ static QString openRouterKey(bool settingsKeys)
     return settings.value("openRouterKey").toString().trimmed();
 }
 
+static QString nvidiaKey()
+{
+    const QByteArray env = qgetenv("NVIDIA_API_KEY");
+    return QString::fromUtf8(env).trimmed();
+}
+
+static QString nvidiaKey(bool settingsKeys)
+{
+    const QString key = nvidiaKey();
+    if (!key.isEmpty() || !settingsKeys) {
+        return key;
+    }
+    QSettings settings("NilsDurner", "MyChatty");
+    return settings.value("nvidiaKey").toString().trimmed();
+}
+
 static QString exaKey()
 {
     const QByteArray env = qgetenv("EXA_API_KEY");
@@ -92,7 +108,7 @@ int main(int argc, char *argv[])
     parser.setApplicationDescription("Run MyChatty provider calls through the shared app code.");
     parser.addHelpOption();
     parser.addOptions({
-        {{"p", "provider"}, "Provider: openai or openrouter.", "provider", "openai"},
+        {{"p", "provider"}, "Provider: openai, openrouter, or nvidia.", "provider", "openai"},
         {{"m", "model"}, "API model name or display name.", "model"},
         {{"e", "effort"}, "Effort: Instant, Medium, High, Extra High, Pro.", "effort", "Medium"},
         {{"q", "prompt"}, "Prompt text.", "prompt"},
@@ -103,6 +119,7 @@ int main(int argc, char *argv[])
         {"exa-search", "Use Exa for web search instead of provider-native search."},
         {"json", "Print result JSON instead of streaming plain text."},
         {"dry-run", "Print the JSON request payload and exit."},
+        {"no-stream", "Disable streaming for chat-completions providers."},
         {"no-cache", "Bypass and overwrite the CLI response cache."},
         {"code-interpreter", "Advertise the local eval_javascript Code Interpreter tool."},
         {"settings-keys", "Read missing provider API keys from the MyChatty app QSettings domain."},
@@ -124,11 +141,25 @@ int main(int argc, char *argv[])
     ModelInfo model = modelArg.isEmpty()
         ? (provider == "openrouter"
                ? ModelCatalog::modelForApiName("google/gemma-4-26b-a4b-it:free")
-               : ModelCatalog::modelForApiName("gpt-5.4-mini"))
+               : provider == "nvidia"
+                   ? ModelCatalog::modelForProviderAndDisplayName("NVIDIA", "MiniMax M3")
+                   : ModelCatalog::modelForApiName("gpt-5.4-mini"))
         : ModelCatalog::modelForApiName(modelArg);
     if (provider == "openrouter" && model.provider != ApiProvider::OpenRouterChat) {
         model.provider = ApiProvider::OpenRouterChat;
         model.providerLabel = "OpenRouter";
+    } else if (provider == "nvidia" && model.provider != ApiProvider::NvidiaChat) {
+        const ModelInfo providerModel = ModelCatalog::modelForProviderAndDisplayName("NVIDIA", modelArg);
+        if (providerModel.displayName.compare(modelArg, Qt::CaseInsensitive) == 0
+            || providerModel.apiModel.compare(modelArg, Qt::CaseInsensitive) == 0) {
+            model = providerModel;
+        } else {
+            model.provider = ApiProvider::NvidiaChat;
+            model.providerLabel = "NVIDIA";
+            model.apiModel = modelArg;
+            model.displayName = modelArg;
+            model.menuTitle = modelArg;
+        }
     } else if (provider == "openai") {
         model.provider = ApiProvider::OpenAIResponses;
         model.providerLabel = "OpenAI";
@@ -150,12 +181,15 @@ int main(int argc, char *argv[])
     request.enableWebSearch = parser.isSet("web-search");
     request.useExaSearch = parser.isSet("exa-search");
     request.enableJavaScriptUse = parser.isSet("code-interpreter");
-    request.stream = true;
+    request.stream = !parser.isSet("no-stream");
     request.apiKey = model.provider == ApiProvider::OpenRouterChat
         ? openRouterKey(parser.isSet("settings-keys"))
-        : openAIKey(parser.isSet("settings-keys"));
+        : model.provider == ApiProvider::NvidiaChat
+            ? nvidiaKey(parser.isSet("settings-keys"))
+            : openAIKey(parser.isSet("settings-keys"));
 
-    const QJsonObject payload = model.provider == ApiProvider::OpenRouterChat
+    const QJsonObject payload = (model.provider == ApiProvider::OpenRouterChat
+                                 || model.provider == ApiProvider::NvidiaChat)
         ? buildOpenaiChatPayload(request)
         : buildOpenaiResponsesPayload(request);
     if (parser.isSet("dry-run")) {
@@ -184,7 +218,8 @@ int main(int argc, char *argv[])
     }
 
     std::unique_ptr<ApiClient> client;
-    if (model.provider == ApiProvider::OpenRouterChat) {
+    if (model.provider == ApiProvider::OpenRouterChat
+        || model.provider == ApiProvider::NvidiaChat) {
         client = std::make_unique<OpenaiChatAPI>();
     } else {
         client = std::make_unique<OpenaiResponsesAPI>();

@@ -18,8 +18,10 @@ class ChatController : public QObject {
     Q_PROPERTY(QAbstractItemModel *messages READ messages CONSTANT)
     Q_PROPERTY(QVariantList pendingAttachments READ pendingAttachments NOTIFY pendingAttachmentsChanged)
     Q_PROPERTY(QVariantList recents READ recents NOTIFY recentsChanged)
-    Q_PROPERTY(QVariantList modelOptions READ modelOptions CONSTANT)
+    Q_PROPERTY(QVariantList providerOptions READ providerOptions CONSTANT)
+    Q_PROPERTY(QVariantList modelOptions READ modelOptions NOTIFY selectedProviderChanged)
     Q_PROPERTY(QVariantList effortOptions READ effortOptions CONSTANT)
+    Q_PROPERTY(QString selectedProvider READ selectedProvider WRITE setSelectedProvider NOTIFY selectedProviderChanged)
     Q_PROPERTY(QString selectedModel READ selectedModel WRITE setSelectedModel NOTIFY selectedModelChanged)
     Q_PROPERTY(QString selectedEffort READ selectedEffort WRITE setSelectedEffort NOTIFY selectedEffortChanged)
     Q_PROPERTY(QString selectorLabel READ selectorLabel NOTIFY selectedModelChanged)
@@ -32,8 +34,10 @@ public:
     QAbstractItemModel *messages();
     QVariantList pendingAttachments() const;
     QVariantList recents() const;
+    QVariantList providerOptions() const;
     QVariantList modelOptions() const;
     QVariantList effortOptions() const;
+    QString selectedProvider() const;
     QString selectedModel() const;
     QString selectedEffort() const;
     QString selectorLabel() const;
@@ -41,6 +45,7 @@ public:
     bool busy() const;
     QString toast() const;
 
+    void setSelectedProvider(const QString &value);
     void setSelectedModel(const QString &value);
     void setSelectedEffort(const QString &value);
 
@@ -60,6 +65,7 @@ public:
 signals:
     void pendingAttachmentsChanged();
     void recentsChanged();
+    void selectedProviderChanged();
     void selectedModelChanged();
     void selectedEffortChanged();
     void busyChanged();
@@ -101,6 +107,7 @@ private:
     QList<Attachment> m_pendingAttachments;
     QList<Conversation> m_conversations;
     QString m_currentConversationId;
+    QString m_selectedProvider = "OpenRouter";
     QString m_selectedModel = "Gemma 4 Free";
     QString m_selectedEffort = "Medium";
     bool m_busy = false;

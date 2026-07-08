@@ -329,9 +329,14 @@ QVariantList ChatController::recents() const
     return ConversationStore::recentsAsVariant(m_conversations);
 }
 
+QVariantList ChatController::providerOptions() const
+{
+    return ModelCatalog::providerOptions();
+}
+
 QVariantList ChatController::modelOptions() const
 {
-    return ModelCatalog::modelOptions();
+    return ModelCatalog::modelOptionsForProvider(m_selectedProvider);
 }
 
 QVariantList ChatController::effortOptions() const
@@ -344,6 +349,11 @@ QString ChatController::selectedModel() const
     return m_selectedModel;
 }
 
+QString ChatController::selectedProvider() const
+{
+    return m_selectedProvider;
+}
+
 QString ChatController::selectedEffort() const
 {
     return m_selectedEffort;
@@ -351,12 +361,12 @@ QString ChatController::selectedEffort() const
 
 QString ChatController::selectorLabel() const
 {
-    return QStringLiteral("%1 %2").arg(m_selectedModel, m_selectedEffort);
+    return QStringLiteral("%1 %2 %3").arg(m_selectedProvider, m_selectedModel, m_selectedEffort);
 }
 
 QString ChatController::selectedMenuTitle() const
 {
-    return ModelCatalog::modelForDisplayName(m_selectedModel).menuTitle;
+    return ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel).menuTitle;
 }
 
 bool ChatController::busy() const
@@ -376,6 +386,28 @@ void ChatController::setSelectedModel(const QString &value)
     }
     m_selectedModel = value;
     emit selectedModelChanged();
+}
+
+void ChatController::setSelectedProvider(const QString &value)
+{
+    if (m_selectedProvider == value) {
+        return;
+    }
+    m_selectedProvider = value;
+    const QVariantList options = ModelCatalog::modelOptionsForProvider(m_selectedProvider);
+    bool hasSelectedModel = false;
+    for (const QVariant &option : options) {
+        const QVariantMap row = option.toMap();
+        if (row.value(QStringLiteral("displayName")).toString() == m_selectedModel) {
+            hasSelectedModel = true;
+            break;
+        }
+    }
+    if (!hasSelectedModel && !options.isEmpty()) {
+        m_selectedModel = options.first().toMap().value(QStringLiteral("displayName")).toString();
+        emit selectedModelChanged();
+    }
+    emit selectedProviderChanged();
 }
 
 void ChatController::setSelectedEffort(const QString &value)
@@ -443,7 +475,7 @@ ChatRequest ChatController::makeRequest() const
 {
     ChatRequest request;
     request.history = m_messages.messages();
-    request.model = ModelCatalog::modelForDisplayName(m_selectedModel);
+    request.model = ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel);
     request.effort = m_selectedEffort;
     request.customInstructions = m_settings ? m_settings->customInstructions() : QString();
     request.apiKey = apiKeyForModel(request.model);
@@ -462,7 +494,8 @@ void ChatController::beginRequest(const ChatRequest &request, int assistantRow, 
 {
     resetStreamBuffer();
     setBusy(true);
-    if (request.model.provider == ApiProvider::OpenRouterChat) {
+    if (request.model.provider == ApiProvider::OpenRouterChat
+        || request.model.provider == ApiProvider::NvidiaChat) {
         m_client = std::make_unique<OpenaiChatAPI>();
     } else {
         m_client = std::make_unique<OpenaiResponsesAPI>();
@@ -931,8 +964,12 @@ void ChatController::loadConversation(const QString &id)
             resetStreamBuffer();
             m_currentConversationId = conversation.id;
             m_selectedModel = conversation.model;
+            m_selectedProvider = conversation.provider.isEmpty()
+                ? ModelCatalog::modelForDisplayName(conversation.model).providerLabel
+                : conversation.provider;
             m_selectedEffort = conversation.effort;
             m_messages.setMessages(conversation.messages);
+            emit selectedProviderChanged();
             emit selectedModelChanged();
             emit selectedEffortChanged();
             return;
@@ -1009,6 +1046,7 @@ void ChatController::persistCurrentConversation()
     conversation.id = m_currentConversationId.isEmpty() ? newId("conv") : m_currentConversationId;
     conversation.title = titleForConversation();
     conversation.model = m_selectedModel;
+    conversation.provider = m_selectedProvider;
     conversation.effort = m_selectedEffort;
     conversation.createdAt = QDateTime::currentDateTimeUtc();
     conversation.updatedAt = QDateTime::currentDateTimeUtc();
@@ -1031,6 +1069,9 @@ QString ChatController::apiKeyForModel(const ModelInfo &model) const
     }
     if (model.provider == ApiProvider::OpenRouterChat) {
         return m_settings->openRouterKey();
+    }
+    if (model.provider == ApiProvider::NvidiaChat) {
+        return m_settings->nvidiaKey();
     }
     return m_settings->openAIKey();
 }
