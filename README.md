@@ -232,9 +232,9 @@ The built-in model catalog currently contains:
 | GPT-5.5 | `gpt-5.5` | OpenAI Responses | |
 | GPT-5.4 mini | `gpt-5.4-mini` | OpenAI Responses | |
 | GPT-5.5 Pro | `gpt-5.5-pro` | OpenAI Responses | |
-| GPT-5.5 | `openai/gpt-5.5` | OpenRouter | |
-| GPT-5.4 mini | `openai/gpt-5.4-mini` | OpenRouter | |
-| GPT-5.5 Pro | `openai/gpt-5.5-pro` | OpenRouter | |
+| GPT-5.6 Sol | `openai/gpt-5.6-sol` | OpenRouter | |
+| GPT-5.6 Terra | `openai/gpt-5.6-terra` | OpenRouter | |
+| GPT-5.6 Luna | `openai/gpt-5.6-luna` | OpenRouter | |
 | GLM-5.2 | `z-ai/glm-5.2` | OpenRouter | Parasail |
 | Kimi K2.6 | `moonshotai/kimi-k2.6` | OpenRouter | Moonshot AI |
 | Gemini 3.5 Flash | `google/gemini-3.5-flash` | OpenRouter | |

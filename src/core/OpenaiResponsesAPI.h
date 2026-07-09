@@ -12,9 +12,11 @@ public:
 
     void send(const ChatRequest &request) override;
 
-private:
+private slots:
     void handleEvent(const QString &eventName, const QByteArray &data);
     void finishFromReply();
+
+private:
     void completeIfNeeded();
     void absorbCompletedResponse(const QJsonObject &response);
     void appendReasoningSnapshot(const QString &text);

@@ -4,6 +4,7 @@
 #include "ChatTypes.h"
 #include "MarkdownRenderer.h"
 #include "ModelCatalog.h"
+#include "OpenaiResponsesAPI.h"
 #include "SseParser.h"
 #include "ToolExecutor.h"
 
@@ -31,6 +32,12 @@ private slots:
         QCOMPARE(ModelCatalog::modelForDisplayName("5.5").apiModel, QString("gpt-5.5"));
         QCOMPARE(ModelCatalog::modelForDisplayName("5.4-mini").apiModel, QString("gpt-5.4-mini"));
         QCOMPARE(ModelCatalog::modelForDisplayName("5.5 Pro").apiModel, QString("gpt-5.5-pro"));
+        QCOMPARE(ModelCatalog::modelForProviderAndDisplayName("OpenRouter", "5.6 Sol").apiModel,
+                 QString("openai/gpt-5.6-sol"));
+        QCOMPARE(ModelCatalog::modelForProviderAndDisplayName("OpenRouter", "5.6 Terra").apiModel,
+                 QString("openai/gpt-5.6-terra"));
+        QCOMPARE(ModelCatalog::modelForProviderAndDisplayName("OpenRouter", "5.6 Luna").apiModel,
+                 QString("openai/gpt-5.6-luna"));
         const ModelInfo glm = ModelCatalog::modelForDisplayName("GLM-5.2");
         QCOMPARE(glm.apiModel, QString("z-ai/glm-5.2"));
         QCOMPARE(glm.provider, ApiProvider::OpenRouterChat);
@@ -132,6 +139,27 @@ private slots:
         QVERIFY(payload.contains("reasoning"));
         QCOMPARE(payload.value("reasoning").toObject().value("effort").toString(), QString("high"));
         QVERIFY(payload.value("instructions").toString().contains("Be terse."));
+    }
+
+    void responsesApiReportsNestedFailureMessage()
+    {
+        OpenaiResponsesAPI client;
+        QSignalSpy failed(&client, &ApiClient::failed);
+        const QJsonObject event{
+            {"type", "response.failed"},
+            {"response", QJsonObject{
+                {"error", QJsonObject{{"message", "The requested model does not exist."}}}
+            }}
+        };
+
+        QVERIFY(QMetaObject::invokeMethod(
+            &client,
+            "handleEvent",
+            Qt::DirectConnection,
+            Q_ARG(QString, QStringLiteral("response.failed")),
+            Q_ARG(QByteArray, QJsonDocument(event).toJson(QJsonDocument::Compact))));
+        QCOMPARE(failed.count(), 1);
+        QCOMPARE(failed.first().first().toString(), QString("The requested model does not exist."));
     }
 
     void responsesPayloadSupportsNativeWebSearch()

@@ -83,7 +83,10 @@ void OpenaiResponsesAPI::handleEvent(const QString &eventName, const QByteArray 
         absorbCompletedResponse(object.value("response").toObject());
         completeIfNeeded();
     } else if (type == "response.failed" || type == "error") {
-        const QJsonObject error = object.value("error").toObject();
+        QJsonObject error = object.value("error").toObject();
+        if (error.isEmpty()) {
+            error = object.value("response").toObject().value("error").toObject();
+        }
         const QString message = error.value("message").toString(object.value("message").toString());
         emit failed(message.isEmpty() ? QStringLiteral("OpenAI request failed") : message);
     }
