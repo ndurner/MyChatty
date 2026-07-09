@@ -24,7 +24,9 @@ class ChatController : public QObject {
     Q_PROPERTY(QString selectedProvider READ selectedProvider WRITE setSelectedProvider NOTIFY selectedProviderChanged)
     Q_PROPERTY(QString selectedModel READ selectedModel WRITE setSelectedModel NOTIFY selectedModelChanged)
     Q_PROPERTY(QString selectedEffort READ selectedEffort WRITE setSelectedEffort NOTIFY selectedEffortChanged)
-    Q_PROPERTY(QString selectorLabel READ selectorLabel NOTIFY selectedModelChanged)
+    Q_PROPERTY(QString selectedReasoningMode READ selectedReasoningMode WRITE setSelectedReasoningMode NOTIFY selectedReasoningModeChanged)
+    Q_PROPERTY(bool supportsProReasoning READ supportsProReasoning NOTIFY selectedModelChanged)
+    Q_PROPERTY(QString selectorLabel READ selectorLabel NOTIFY selectorLabelChanged)
     Q_PROPERTY(QString selectedMenuTitle READ selectedMenuTitle NOTIFY selectedModelChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString toast READ toast NOTIFY toastChanged)
@@ -40,6 +42,8 @@ public:
     QString selectedProvider() const;
     QString selectedModel() const;
     QString selectedEffort() const;
+    QString selectedReasoningMode() const;
+    bool supportsProReasoning() const;
     QString selectorLabel() const;
     QString selectedMenuTitle() const;
     bool busy() const;
@@ -48,6 +52,7 @@ public:
     void setSelectedProvider(const QString &value);
     void setSelectedModel(const QString &value);
     void setSelectedEffort(const QString &value);
+    void setSelectedReasoningMode(const QString &value);
 
     Q_INVOKABLE void sendMessage(const QString &text);
     Q_INVOKABLE void attachFiles(const QVariant &urls, const QString &origin);
@@ -70,6 +75,8 @@ signals:
     void selectedProviderChanged();
     void selectedModelChanged();
     void selectedEffortChanged();
+    void selectedReasoningModeChanged();
+    void selectorLabelChanged();
     void busyChanged();
     void toastChanged();
 
@@ -113,6 +120,7 @@ private:
     QString m_selectedProvider = "OpenRouter";
     QString m_selectedModel = "Gemma 4 Free";
     QString m_selectedEffort = "Medium";
+    QString m_selectedReasoningMode = "Standard";
     bool m_busy = false;
     QString m_toast;
     std::unique_ptr<ApiClient> m_client;

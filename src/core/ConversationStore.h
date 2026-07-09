@@ -13,6 +13,7 @@ struct Conversation {
     QString provider;
     QString model;
     QString effort;
+    QString reasoningMode = QStringLiteral("Standard");
     QDateTime createdAt;
     QDateTime updatedAt;
     QList<ChatMessage> messages;

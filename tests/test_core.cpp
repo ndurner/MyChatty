@@ -29,6 +29,12 @@ class CoreTests : public QObject {
 private slots:
     void modelCatalogContainsRequestedModels()
     {
+        QCOMPARE(ModelCatalog::modelForProviderAndDisplayName("OpenAI", "5.6 Sol").apiModel,
+                 QString("gpt-5.6-sol"));
+        QCOMPARE(ModelCatalog::modelForProviderAndDisplayName("OpenAI", "5.6 Terra").apiModel,
+                 QString("gpt-5.6-terra"));
+        QCOMPARE(ModelCatalog::modelForProviderAndDisplayName("OpenAI", "5.6 Luna").apiModel,
+                 QString("gpt-5.6-luna"));
         QCOMPARE(ModelCatalog::modelForDisplayName("5.5").apiModel, QString("gpt-5.5"));
         QCOMPARE(ModelCatalog::modelForDisplayName("5.4-mini").apiModel, QString("gpt-5.4-mini"));
         QCOMPARE(ModelCatalog::modelForDisplayName("5.5 Pro").apiModel, QString("gpt-5.5-pro"));
@@ -84,6 +90,55 @@ private slots:
         QCOMPARE(nvidiaGptOss.apiModel, QString("openai/gpt-oss-120b"));
         QCOMPARE(nvidiaGptOss.provider, ApiProvider::NvidiaChat);
         QCOMPARE(nvidiaGptOss.chatParameters.value("max_tokens").toInt(), 4096);
+        QVERIFY(!ModelCatalog::effortOptions().contains(QStringLiteral("Pro")));
+        QCOMPARE(ModelCatalog::openAIReasoningEffort(QStringLiteral("Extra High")), QStringLiteral("xhigh"));
+    }
+
+    void gpt56ProModeUsesProviderSpecificRequestShape()
+    {
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "hello";
+
+        ChatRequest request;
+        request.history = {user};
+        request.effort = "Medium";
+        request.reasoningMode = "Pro";
+
+        request.model = ModelCatalog::modelForProviderAndDisplayName("OpenAI", "5.6 Sol");
+        QJsonObject payload = buildOpenaiResponsesPayload(request);
+        QCOMPARE(payload.value("model").toString(), QString("gpt-5.6-sol"));
+        QCOMPARE(payload.value("reasoning").toObject().value("mode").toString(), QString("pro"));
+        QCOMPARE(payload.value("reasoning").toObject().value("effort").toString(), QString("medium"));
+
+        request.model = ModelCatalog::modelForProviderAndDisplayName("OpenRouter", "5.6 Sol");
+        payload = buildOpenaiChatPayload(request);
+        QCOMPARE(payload.value("model").toString(), QString("openai/gpt-5.6-sol-pro"));
+        QVERIFY(!payload.value("reasoning").toObject().contains("mode"));
+        QCOMPARE(payload.value("reasoning").toObject().value("effort").toString(), QString("medium"));
+
+        request.reasoningMode = "Standard";
+        payload = buildOpenaiChatPayload(request);
+        QCOMPARE(payload.value("model").toString(), QString("openai/gpt-5.6-sol"));
+    }
+
+    void legacyProModelDoesNotReceiveGpt56Mode()
+    {
+        ChatMessage user;
+        user.id = "u1";
+        user.role = "user";
+        user.text = "hello";
+
+        ChatRequest request;
+        request.history = {user};
+        request.model = ModelCatalog::modelForProviderAndDisplayName("OpenAI", "5.5 Pro");
+        request.effort = "High";
+        request.reasoningMode = "Pro";
+
+        const QJsonObject payload = buildOpenaiResponsesPayload(request);
+        QCOMPARE(payload.value("model").toString(), QString("gpt-5.5-pro"));
+        QVERIFY(!payload.value("reasoning").toObject().contains("mode"));
     }
 
     void openRouterPayloadPinsParasailForGlm()

@@ -162,6 +162,8 @@ Use `--dry-run` to inspect the JSON payload without making a network request:
 Useful options:
 
 - `--effort "Medium"`: selects the reasoning/effort mapping.
+- `--reasoning-mode Pro`: enables GPT-5.6 Pro mode. OpenAI sends
+  `reasoning.mode`; OpenRouter selects its corresponding `-pro` model.
 - `--max-tokens 256`: caps output tokens.
 - `--instructions "..."`: adds custom instructions.
 - `--web-search`: enables web search for OpenAI and OpenRouter calls.
@@ -229,6 +231,9 @@ The built-in model catalog currently contains:
 
 | Display name | API model | API provider | Pinned provider |
 | --- | --- | --- | --- |
+| GPT-5.6 Sol | `gpt-5.6-sol` | OpenAI Responses | |
+| GPT-5.6 Terra | `gpt-5.6-terra` | OpenAI Responses | |
+| GPT-5.6 Luna | `gpt-5.6-luna` | OpenAI Responses | |
 | GPT-5.5 | `gpt-5.5` | OpenAI Responses | |
 | GPT-5.4 mini | `gpt-5.4-mini` | OpenAI Responses | |
 | GPT-5.5 Pro | `gpt-5.5-pro` | OpenAI Responses | |

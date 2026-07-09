@@ -74,6 +74,42 @@ Popup {
             width: parent.width
             spacing: 5
             Text {
+                visible: controller.supportsProReasoning
+                text: "Reasoning mode"
+                color: "#999999"
+                font.pixelSize: 18
+                leftPadding: 35
+                height: 34
+                verticalAlignment: Text.AlignVCenter
+            }
+            Row {
+                visible: controller.supportsProReasoning
+                width: parent.width
+                height: 44
+                spacing: 8
+                Repeater {
+                    model: ["Standard", "Pro"]
+                    delegate: Button {
+                        width: (parent.width - parent.spacing) / 2
+                        height: parent.height
+                        padding: 0
+                        onClicked: controller.selectedReasoningMode = modelData
+                        background: Rectangle {
+                            radius: 12
+                            color: controller.selectedReasoningMode === modelData ? "#dedede" : "transparent"
+                            border.color: "#d2d2d2"
+                        }
+                        contentItem: Text {
+                            text: modelData
+                            font.pixelSize: 18
+                            color: "#111111"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+                }
+            }
+            Text {
                 text: "Intelligence"
                 color: "#999999"
                 font.pixelSize: 18

@@ -359,9 +359,23 @@ QString ChatController::selectedEffort() const
     return m_selectedEffort;
 }
 
+QString ChatController::selectedReasoningMode() const
+{
+    return m_selectedReasoningMode;
+}
+
+bool ChatController::supportsProReasoning() const
+{
+    return ModelCatalog::supportsProReasoning(
+        ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel));
+}
+
 QString ChatController::selectorLabel() const
 {
-    return QStringLiteral("%1 %2 %3").arg(m_selectedProvider, m_selectedModel, m_selectedEffort);
+    const QString mode = m_selectedReasoningMode.compare(QStringLiteral("Pro"), Qt::CaseInsensitive) == 0
+        ? QStringLiteral(" Pro")
+        : QString();
+    return QStringLiteral("%1 %2 %3%4").arg(m_selectedProvider, m_selectedModel, m_selectedEffort, mode);
 }
 
 QString ChatController::selectedMenuTitle() const
@@ -385,7 +399,12 @@ void ChatController::setSelectedModel(const QString &value)
         return;
     }
     m_selectedModel = value;
+    if (!supportsProReasoning() && m_selectedReasoningMode != QStringLiteral("Standard")) {
+        m_selectedReasoningMode = QStringLiteral("Standard");
+        emit selectedReasoningModeChanged();
+    }
     emit selectedModelChanged();
+    emit selectorLabelChanged();
 }
 
 void ChatController::setSelectedProvider(const QString &value)
@@ -407,7 +426,12 @@ void ChatController::setSelectedProvider(const QString &value)
         m_selectedModel = options.first().toMap().value(QStringLiteral("displayName")).toString();
         emit selectedModelChanged();
     }
+    if (!supportsProReasoning() && m_selectedReasoningMode != QStringLiteral("Standard")) {
+        m_selectedReasoningMode = QStringLiteral("Standard");
+        emit selectedReasoningModeChanged();
+    }
     emit selectedProviderChanged();
+    emit selectorLabelChanged();
 }
 
 void ChatController::setSelectedEffort(const QString &value)
@@ -417,6 +441,21 @@ void ChatController::setSelectedEffort(const QString &value)
     }
     m_selectedEffort = value;
     emit selectedEffortChanged();
+    emit selectorLabelChanged();
+}
+
+void ChatController::setSelectedReasoningMode(const QString &value)
+{
+    const QString normalized = value.compare(QStringLiteral("Pro"), Qt::CaseInsensitive) == 0
+            && supportsProReasoning()
+        ? QStringLiteral("Pro")
+        : QStringLiteral("Standard");
+    if (m_selectedReasoningMode == normalized) {
+        return;
+    }
+    m_selectedReasoningMode = normalized;
+    emit selectedReasoningModeChanged();
+    emit selectorLabelChanged();
 }
 
 void ChatController::sendMessage(const QString &text)
@@ -482,6 +521,7 @@ ChatRequest ChatController::makeRequest() const
     request.history = m_messages.messages();
     request.model = ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel);
     request.effort = m_selectedEffort;
+    request.reasoningMode = m_selectedReasoningMode;
     request.customInstructions = m_settings ? m_settings->customInstructions() : QString();
     request.apiKey = apiKeyForModel(request.model);
     request.exaApiKey = m_settings ? m_settings->exaKey() : QString();
@@ -1033,10 +1073,16 @@ void ChatController::loadConversation(const QString &id)
                 ? ModelCatalog::modelForDisplayName(conversation.model).providerLabel
                 : conversation.provider;
             m_selectedEffort = conversation.effort;
+            m_selectedReasoningMode = conversation.reasoningMode;
+            if (!supportsProReasoning()) {
+                m_selectedReasoningMode = QStringLiteral("Standard");
+            }
             m_messages.setMessages(conversation.messages);
             emit selectedProviderChanged();
             emit selectedModelChanged();
             emit selectedEffortChanged();
+            emit selectedReasoningModeChanged();
+            emit selectorLabelChanged();
             return;
         }
     }
@@ -1113,6 +1159,7 @@ void ChatController::persistCurrentConversation()
     conversation.model = m_selectedModel;
     conversation.provider = m_selectedProvider;
     conversation.effort = m_selectedEffort;
+    conversation.reasoningMode = m_selectedReasoningMode;
     conversation.createdAt = QDateTime::currentDateTimeUtc();
     conversation.updatedAt = QDateTime::currentDateTimeUtc();
     conversation.messages = m_messages.messages();

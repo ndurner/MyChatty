@@ -53,6 +53,7 @@ struct ChatRequest {
     QList<ChatMessage> history;
     ModelInfo model;
     QString effort;
+    QString reasoningMode = QStringLiteral("Standard");
     QString customInstructions;
     QString apiKey;
     QString exaApiKey;

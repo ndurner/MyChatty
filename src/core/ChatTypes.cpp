@@ -454,6 +454,13 @@ QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
         {"include", QJsonArray{"reasoning.encrypted_content"}},
     };
 
+    if (request.reasoningMode.compare(QStringLiteral("Pro"), Qt::CaseInsensitive) == 0
+        && ModelCatalog::supportsProReasoning(request.model)) {
+        QJsonObject reasoning = body.value(QStringLiteral("reasoning")).toObject();
+        reasoning[QStringLiteral("mode")] = QStringLiteral("pro");
+        body[QStringLiteral("reasoning")] = reasoning;
+    }
+
     if (!request.customInstructions.trimmed().isEmpty()) {
         body["instructions"] = QStringLiteral("Formatting re-enabled\n%1").arg(request.customInstructions.trimmed());
     }
@@ -525,8 +532,16 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
         }
     }
 
+    QString apiModel = request.model.apiModel;
+    if (openRouter
+        && request.reasoningMode.compare(QStringLiteral("Pro"), Qt::CaseInsensitive) == 0
+        && ModelCatalog::supportsProReasoning(request.model)
+        && !apiModel.endsWith(QStringLiteral("-pro"), Qt::CaseInsensitive)) {
+        apiModel += QStringLiteral("-pro");
+    }
+
     QJsonObject body{
-        {"model", request.model.apiModel},
+        {"model", apiModel},
         {"messages", messages},
         {"stream", request.stream},
     };

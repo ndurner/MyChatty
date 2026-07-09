@@ -110,7 +110,8 @@ int main(int argc, char *argv[])
     parser.addOptions({
         {{"p", "provider"}, "Provider: openai, openrouter, or nvidia.", "provider", "openai"},
         {{"m", "model"}, "API model name or display name.", "model"},
-        {{"e", "effort"}, "Effort: Instant, Medium, High, Extra High, Pro.", "effort", "Medium"},
+        {{"e", "effort"}, "Effort: Instant, Medium, High, or Extra High.", "effort", "Medium"},
+        {"reasoning-mode", "GPT-5.6 reasoning mode: Standard or Pro.", "mode", "Standard"},
         {{"q", "prompt"}, "Prompt text.", "prompt"},
         {{"f", "file"}, "Read prompt text from a file.", "file"},
         {{"i", "instructions"}, "Custom instructions.", "instructions"},
@@ -175,6 +176,7 @@ int main(int argc, char *argv[])
     request.history = {user};
     request.model = model;
     request.effort = parser.value("effort");
+    request.reasoningMode = parser.value("reasoning-mode");
     request.customInstructions = parser.value("instructions");
     request.maxOutputTokens = parser.value("max-tokens").toInt();
     request.exaApiKey = exaKey();

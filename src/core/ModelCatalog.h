@@ -36,6 +36,7 @@ public:
     static QVariantList modelOptionsForProvider(const QString &provider);
     static QVariantList effortOptions();
     static QString providerName(ApiProvider provider);
+    static bool supportsProReasoning(const ModelInfo &model);
     static QString openAIReasoningEffort(const QString &effort);
     static QString openRouterReasoningEffort(const QString &effort);
     static QString nvidiaReasoningEffort(const QString &effort);

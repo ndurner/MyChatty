@@ -21,6 +21,7 @@ static QJsonObject conversationToJson(const Conversation &conversation)
         {"provider", conversation.provider},
         {"model", conversation.model},
         {"effort", conversation.effort},
+        {"reasoningMode", conversation.reasoningMode},
         {"createdAt", conversation.createdAt.toUTC().toString(Qt::ISODateWithMs)},
         {"updatedAt", conversation.updatedAt.toUTC().toString(Qt::ISODateWithMs)},
         {"messages", messages},
@@ -38,6 +39,20 @@ static Conversation conversationFromJson(const QJsonObject &object)
         conversation.provider = ModelCatalog::modelForDisplayName(conversation.model).providerLabel;
     }
     conversation.effort = object.value("effort").toString("Medium");
+    conversation.reasoningMode = object.value("reasoningMode").toString("Standard");
+    if (!object.contains("reasoningMode")
+        && conversation.effort.compare(QStringLiteral("Pro"), Qt::CaseInsensitive) == 0) {
+        const ModelInfo model = ModelCatalog::modelForProviderAndDisplayName(
+            conversation.provider, conversation.model);
+        if (ModelCatalog::supportsProReasoning(model)) {
+            conversation.reasoningMode = QStringLiteral("Pro");
+            conversation.effort = QStringLiteral("Medium");
+        } else {
+            conversation.effort = model.provider == ApiProvider::OpenAIResponses
+                ? QStringLiteral("High")
+                : QStringLiteral("Extra High");
+        }
+    }
     conversation.createdAt = QDateTime::fromString(object.value("createdAt").toString(), Qt::ISODateWithMs);
     conversation.updatedAt = QDateTime::fromString(object.value("updatedAt").toString(), Qt::ISODateWithMs);
     if (!conversation.createdAt.isValid()) {

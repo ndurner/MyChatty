@@ -5,6 +5,9 @@ namespace MyChatty {
 QList<ModelInfo> ModelCatalog::models()
 {
     return {
+        {"5.6 Sol", "GPT-5.6 Sol", "gpt-5.6-sol", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
+        {"5.6 Terra", "GPT-5.6 Terra", "gpt-5.6-terra", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
+        {"5.6 Luna", "GPT-5.6 Luna", "gpt-5.6-luna", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
         {"5.5", "GPT-5.5", "gpt-5.5", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
         {"5.4-mini", "GPT-5.4 mini", "gpt-5.4-mini", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
         {"5.5 Pro", "GPT-5.5 Pro", "gpt-5.5-pro", ApiProvider::OpenAIResponses, "OpenAI", {}, true, true},
@@ -122,7 +125,7 @@ QVariantList ModelCatalog::modelOptionsForProvider(const QString &provider)
 
 QVariantList ModelCatalog::effortOptions()
 {
-    return {"Instant", "Medium", "High", "Extra High", "Pro"};
+    return {"Instant", "Medium", "High", "Extra High"};
 }
 
 QString ModelCatalog::providerName(ApiProvider provider)
@@ -138,13 +141,31 @@ QString ModelCatalog::providerName(ApiProvider provider)
     return "OpenAI";
 }
 
+bool ModelCatalog::supportsProReasoning(const ModelInfo &model)
+{
+    QString apiModel = model.apiModel.trimmed().toLower();
+    if (apiModel.startsWith(QStringLiteral("openai/"))) {
+        apiModel.remove(0, QStringLiteral("openai/").size());
+    }
+    if (apiModel.endsWith(QStringLiteral("-pro"))) {
+        apiModel.chop(QStringLiteral("-pro").size());
+    }
+    return (model.provider == ApiProvider::OpenAIResponses
+            || model.provider == ApiProvider::OpenRouterChat)
+        && (apiModel == QStringLiteral("gpt-5.6")
+            || apiModel.startsWith(QStringLiteral("gpt-5.6-")));
+}
+
 QString ModelCatalog::openAIReasoningEffort(const QString &effort)
 {
     const QString normalized = effort.trimmed().toLower();
     if (normalized == "instant") {
         return "low";
     }
-    if (normalized == "high" || normalized == "extra high" || normalized == "pro") {
+    if (normalized == "extra high") {
+        return "xhigh";
+    }
+    if (normalized == "high") {
         return "high";
     }
     return "medium";
