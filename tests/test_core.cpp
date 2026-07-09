@@ -123,6 +123,75 @@ private slots:
         QCOMPARE(payload.value("model").toString(), QString("openai/gpt-5.6-sol"));
     }
 
+    void reasoningEffortMappingsMatchVendorCapabilities()
+    {
+        using EffortMapping = QPair<QString, QString>;
+        const auto verify = [](const QString &provider,
+                               const QString &displayName,
+                               const QList<EffortMapping> &mappings) {
+            const ModelInfo model = ModelCatalog::modelForProviderAndDisplayName(provider, displayName);
+            QVariantList expectedOptions;
+            for (const auto &[uiEffort, apiEffort] : mappings) {
+                expectedOptions.append(uiEffort);
+
+                ChatRequest request;
+                request.model = model;
+                request.effort = uiEffort;
+                const QJsonObject payload = model.provider == ApiProvider::OpenAIResponses
+                    ? buildOpenaiResponsesPayload(request)
+                    : buildOpenaiChatPayload(request);
+
+                if (model.provider == ApiProvider::OpenAIResponses) {
+                    QCOMPARE(payload.value("reasoning").toObject().value("effort").toString(), apiEffort);
+                } else if (model.provider == ApiProvider::OpenRouterChat) {
+                    QCOMPARE(payload.contains("reasoning"), !apiEffort.isEmpty());
+                    if (!apiEffort.isEmpty()) {
+                        QCOMPARE(payload.value("reasoning").toObject().value("effort").toString(), apiEffort);
+                    }
+                } else {
+                    QCOMPARE(payload.contains("reasoning_effort"), !apiEffort.isEmpty());
+                    if (!apiEffort.isEmpty()) {
+                        QCOMPARE(payload.value("reasoning_effort").toString(), apiEffort);
+                    }
+                }
+            }
+            QCOMPARE(ModelCatalog::effortOptionsForModel(model), expectedOptions);
+        };
+
+        const QList<EffortMapping> fullOpenAI{
+            {"Instant", "none"},
+            {"Medium", "medium"},
+            {"High", "high"},
+            {"Extra High", "xhigh"},
+        };
+        for (const QString &model : {QStringLiteral("5.6 Sol"),
+                                     QStringLiteral("5.6 Terra"),
+                                     QStringLiteral("5.6 Luna"),
+                                     QStringLiteral("5.5"),
+                                     QStringLiteral("5.4-mini")}) {
+            verify("OpenAI", model, fullOpenAI);
+        }
+        verify("OpenAI", "5.5 Pro", {{"Medium", "medium"}, {"High", "high"}, {"Extra High", "xhigh"}});
+
+        for (const QString &model : {QStringLiteral("5.6 Sol"),
+                                     QStringLiteral("5.6 Terra"),
+                                     QStringLiteral("5.6 Luna")}) {
+            verify("OpenRouter", model, fullOpenAI);
+        }
+        verify("OpenRouter", "GLM-5.2", {{"High", "high"}, {"Extra High", "xhigh"}});
+        verify("OpenRouter", "Gemini 3.5 Flash", {{"Instant", "minimal"}, {"Medium", "medium"}, {"High", "high"}});
+        verify("OpenRouter", "Gemini Flash Lite", {{"Instant", "minimal"}, {"Medium", "medium"}, {"High", "high"}});
+        verify("OpenRouter", "Gemini Pro Latest", {{"Instant", "low"}, {"Medium", "medium"}, {"High", "high"}});
+        verify("OpenRouter", "GPT OSS 20B", {{"Instant", "low"}, {"Medium", "medium"}, {"High", "high"}});
+        verify("OpenRouter", "Kimi K2.6", {{"Default", ""}});
+        verify("OpenRouter", "Gemma 4 Free", {{"Default", ""}});
+
+        verify("NVIDIA", "Nemotron 3 Ultra 550B A55B", {{"Instant", "none"}, {"Medium", "medium"}, {"High", "high"}});
+        verify("NVIDIA", "GPT OSS 20B", {{"Instant", "low"}, {"Medium", "medium"}, {"High", "high"}});
+        verify("NVIDIA", "GPT OSS 120B", {{"Instant", "low"}, {"Medium", "medium"}, {"High", "high"}});
+        verify("NVIDIA", "GLM-5.2", {{"Default", ""}});
+    }
+
     void legacyProModelDoesNotReceiveGpt56Mode()
     {
         ChatMessage user;
@@ -164,6 +233,8 @@ private slots:
         ChatController controller(nullptr);
         QCOMPARE(controller.selectedModel(), QString("Gemma 4 Free"));
         QCOMPARE(controller.selectedProvider(), QString("OpenRouter"));
+        QCOMPARE(controller.selectedEffort(), QString("Default"));
+        QCOMPARE(controller.effortOptions(), QVariantList{"Default"});
         QCOMPARE(ModelCatalog::modelForDisplayName(controller.selectedModel()).provider,
                  ApiProvider::OpenRouterChat);
     }
@@ -174,7 +245,13 @@ private slots:
         controller.setSelectedProvider("NVIDIA");
         QCOMPARE(controller.selectedProvider(), QString("NVIDIA"));
         QCOMPARE(controller.selectedModel(), QString("GLM-5.2"));
+        QCOMPARE(controller.selectedEffort(), QString("Default"));
+        QCOMPARE(controller.effortOptions(), QVariantList{"Default"});
         QCOMPARE(controller.modelOptions().first().toMap().value("provider").toString(), QString("NVIDIA"));
+
+        controller.setSelectedModel("Nemotron 3 Ultra 550B A55B");
+        QCOMPARE(controller.selectedEffort(), QString("Medium"));
+        QCOMPARE(controller.effortOptions(), QVariantList({"Instant", "Medium", "High"}));
     }
 
     void responsesPayloadUsesResponsesShape()
@@ -307,9 +384,10 @@ private slots:
         QCOMPARE(payload.value("max_tokens").toInt(), 128);
         QCOMPARE(payload.value("reasoning_budget").toInt(), 16384);
         const QJsonObject kwargs = payload.value("chat_template_kwargs").toObject();
-        QCOMPARE(kwargs.value("enable_thinking").toBool(), true);
+        QVERIFY(!kwargs.contains("enable_thinking"));
         QCOMPARE(kwargs.value("force_nonempty_content").toBool(), true);
-        QCOMPARE(kwargs.value("medium_effort").toBool(), true);
+        QVERIFY(!kwargs.contains("medium_effort"));
+        QCOMPARE(payload.value("reasoning_effort").toString(), QString("medium"));
 
         request.model = ModelCatalog::modelForProviderAndDisplayName("NVIDIA", "GPT OSS 20B");
         request.maxOutputTokens = 0;
@@ -317,6 +395,7 @@ private slots:
         QCOMPARE(payload.value("temperature").toInt(), 1);
         QCOMPARE(payload.value("top_p").toInt(), 1);
         QCOMPARE(payload.value("max_tokens").toInt(), 4096);
+        QCOMPARE(payload.value("reasoning_effort").toString(), QString("medium"));
     }
 
     void openRouterPayloadAddsPdfFileParser()

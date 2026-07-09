@@ -35,11 +35,12 @@ public:
     static QVariantList modelOptions();
     static QVariantList modelOptionsForProvider(const QString &provider);
     static QVariantList effortOptions();
+    static QVariantList effortOptionsForModel(const ModelInfo &model);
     static QString providerName(ApiProvider provider);
     static bool supportsProReasoning(const ModelInfo &model);
+    static QString reasoningEffort(const ModelInfo &model, const QString &effort);
     static QString openAIReasoningEffort(const QString &effort);
     static QString openRouterReasoningEffort(const QString &effort);
-    static QString nvidiaReasoningEffort(const QString &effort);
     static QString textVerbosity(const QString &effort);
 };
 

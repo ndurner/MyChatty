@@ -302,6 +302,7 @@ ChatController::ChatController(SettingsStore *settings, QObject *parent)
     m_streamFlushTimer.setInterval(24);
     connect(&m_streamFlushTimer, &QTimer::timeout, this, &ChatController::flushStreamDeltas);
     refreshRecents();
+    normalizeSelectedEffort();
     connect(&m_speech, &SpeechService::ready, this, [this](const QString &) {
         setToast(QStringLiteral("Audio opened."));
     });
@@ -341,7 +342,8 @@ QVariantList ChatController::modelOptions() const
 
 QVariantList ChatController::effortOptions() const
 {
-    return ModelCatalog::effortOptions();
+    return ModelCatalog::effortOptionsForModel(
+        ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel));
 }
 
 QString ChatController::selectedModel() const
@@ -403,7 +405,9 @@ void ChatController::setSelectedModel(const QString &value)
         m_selectedReasoningMode = QStringLiteral("Standard");
         emit selectedReasoningModeChanged();
     }
+    normalizeSelectedEffort();
     emit selectedModelChanged();
+    emit effortOptionsChanged();
     emit selectorLabelChanged();
 }
 
@@ -430,18 +434,39 @@ void ChatController::setSelectedProvider(const QString &value)
         m_selectedReasoningMode = QStringLiteral("Standard");
         emit selectedReasoningModeChanged();
     }
+    normalizeSelectedEffort();
     emit selectedProviderChanged();
+    emit effortOptionsChanged();
     emit selectorLabelChanged();
 }
 
 void ChatController::setSelectedEffort(const QString &value)
 {
+    const QVariantList options = effortOptions();
+    if (!options.contains(value)) {
+        return;
+    }
     if (m_selectedEffort == value) {
         return;
     }
     m_selectedEffort = value;
     emit selectedEffortChanged();
     emit selectorLabelChanged();
+}
+
+void ChatController::normalizeSelectedEffort()
+{
+    const QVariantList options = effortOptions();
+    if (options.contains(m_selectedEffort)) {
+        return;
+    }
+    const QString normalized = options.contains(QStringLiteral("Medium"))
+        ? QStringLiteral("Medium")
+        : options.isEmpty() ? QStringLiteral("Medium") : options.first().toString();
+    if (m_selectedEffort != normalized) {
+        m_selectedEffort = normalized;
+        emit selectedEffortChanged();
+    }
 }
 
 void ChatController::setSelectedReasoningMode(const QString &value)
@@ -1077,10 +1102,12 @@ void ChatController::loadConversation(const QString &id)
             if (!supportsProReasoning()) {
                 m_selectedReasoningMode = QStringLiteral("Standard");
             }
+            normalizeSelectedEffort();
             m_messages.setMessages(conversation.messages);
             emit selectedProviderChanged();
             emit selectedModelChanged();
             emit selectedEffortChanged();
+            emit effortOptionsChanged();
             emit selectedReasoningModeChanged();
             emit selectorLabelChanged();
             return;

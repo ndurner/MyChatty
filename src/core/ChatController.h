@@ -20,7 +20,7 @@ class ChatController : public QObject {
     Q_PROPERTY(QVariantList recents READ recents NOTIFY recentsChanged)
     Q_PROPERTY(QVariantList providerOptions READ providerOptions CONSTANT)
     Q_PROPERTY(QVariantList modelOptions READ modelOptions NOTIFY selectedProviderChanged)
-    Q_PROPERTY(QVariantList effortOptions READ effortOptions CONSTANT)
+    Q_PROPERTY(QVariantList effortOptions READ effortOptions NOTIFY effortOptionsChanged)
     Q_PROPERTY(QString selectedProvider READ selectedProvider WRITE setSelectedProvider NOTIFY selectedProviderChanged)
     Q_PROPERTY(QString selectedModel READ selectedModel WRITE setSelectedModel NOTIFY selectedModelChanged)
     Q_PROPERTY(QString selectedEffort READ selectedEffort WRITE setSelectedEffort NOTIFY selectedEffortChanged)
@@ -75,6 +75,7 @@ signals:
     void selectedProviderChanged();
     void selectedModelChanged();
     void selectedEffortChanged();
+    void effortOptionsChanged();
     void selectedReasoningModeChanged();
     void selectorLabelChanged();
     void busyChanged();
@@ -82,6 +83,7 @@ signals:
 
 private:
     void setBusy(bool value);
+    void normalizeSelectedEffort();
     void setToast(const QString &message);
     ChatRequest makeRequest() const;
     void appendAssistantAndBeginRequest();

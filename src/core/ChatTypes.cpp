@@ -438,15 +438,16 @@ QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
         }
     }
 
+    QJsonObject reasoning{
+        {"effort", ModelCatalog::reasoningEffort(request.model, request.effort)},
+        {"summary", "auto"},
+    };
     QJsonObject body{
         {"model", request.model.apiModel},
         {"input", input},
         {"store", false},
         {"stream", request.stream},
-        {"reasoning", QJsonObject{
-            {"effort", ModelCatalog::openAIReasoningEffort(request.effort)},
-            {"summary", "auto"},
-        }},
+        {"reasoning", reasoning},
         {"text", QJsonObject{
             {"format", QJsonObject{{"type", "text"}}},
             {"verbosity", ModelCatalog::textVerbosity(request.effort)},
@@ -456,9 +457,9 @@ QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
 
     if (request.reasoningMode.compare(QStringLiteral("Pro"), Qt::CaseInsensitive) == 0
         && ModelCatalog::supportsProReasoning(request.model)) {
-        QJsonObject reasoning = body.value(QStringLiteral("reasoning")).toObject();
-        reasoning[QStringLiteral("mode")] = QStringLiteral("pro");
-        body[QStringLiteral("reasoning")] = reasoning;
+        QJsonObject proReasoning = body.value(QStringLiteral("reasoning")).toObject();
+        proReasoning[QStringLiteral("mode")] = QStringLiteral("pro");
+        body[QStringLiteral("reasoning")] = proReasoning;
     }
 
     if (!request.customInstructions.trimmed().isEmpty()) {
@@ -545,9 +546,10 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
         {"messages", messages},
         {"stream", request.stream},
     };
-    if (openRouter) {
+    const QString reasoningEffort = ModelCatalog::reasoningEffort(request.model, request.effort);
+    if (openRouter && !reasoningEffort.isEmpty()) {
         body["reasoning"] = QJsonObject{
-            {"effort", ModelCatalog::openRouterReasoningEffort(request.effort)},
+            {"effort", reasoningEffort},
             {"exclude", false},
         };
     }
@@ -557,11 +559,8 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
     if (request.maxOutputTokens > 0) {
         body["max_tokens"] = request.maxOutputTokens;
     }
-    if (nvidia && request.model.apiModel == QStringLiteral("nvidia/nemotron-3-ultra-550b-a55b")
-        && request.effort.trimmed().compare(QStringLiteral("Medium"), Qt::CaseInsensitive) == 0) {
-        QJsonObject kwargs = body.value(QStringLiteral("chat_template_kwargs")).toObject();
-        kwargs[QStringLiteral("medium_effort")] = true;
-        body[QStringLiteral("chat_template_kwargs")] = kwargs;
+    if (nvidia && !reasoningEffort.isEmpty()) {
+        body[QStringLiteral("reasoning_effort")] = reasoningEffort;
     }
     if (request.enableWebSearch && openRouter) {
         QJsonArray tools = body.value("tools").toArray();

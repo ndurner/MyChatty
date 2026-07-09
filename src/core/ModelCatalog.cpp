@@ -24,7 +24,7 @@ QList<ModelInfo> ModelCatalog::models()
         {"GLM-5.2", "GLM-5.2", "z-ai/glm-5.2", ApiProvider::NvidiaChat, "NVIDIA", {}, false, false,
          QJsonObject{{"temperature", 1}, {"top_p", 1}, {"max_tokens", 16384}}},
         {"Nemotron 3 Ultra 550B A55B", "Nemotron 3 Ultra", "nvidia/nemotron-3-ultra-550b-a55b", ApiProvider::NvidiaChat, "NVIDIA", {}, false, false,
-         QJsonObject{{"temperature", 1}, {"top_p", 0.95}, {"max_tokens", 16384}, {"chat_template_kwargs", QJsonObject{{"enable_thinking", true}, {"force_nonempty_content", true}}}, {"reasoning_budget", 16384}}},
+         QJsonObject{{"temperature", 1}, {"top_p", 0.95}, {"max_tokens", 16384}, {"chat_template_kwargs", QJsonObject{{"force_nonempty_content", true}}}, {"reasoning_budget", 16384}}},
         {"GPT OSS 20B", "GPT OSS 20B", "openai/gpt-oss-20b", ApiProvider::NvidiaChat, "NVIDIA", {}, false, false,
          QJsonObject{{"temperature", 1}, {"top_p", 1}, {"max_tokens", 4096}}},
         {"GPT OSS 120B", "GPT OSS 120B", "openai/gpt-oss-120b", ApiProvider::NvidiaChat, "NVIDIA", {}, false, false,
@@ -128,6 +128,45 @@ QVariantList ModelCatalog::effortOptions()
     return {"Instant", "Medium", "High", "Extra High"};
 }
 
+QVariantList ModelCatalog::effortOptionsForModel(const ModelInfo &model)
+{
+    const QString apiModel = model.apiModel.trimmed().toLower();
+
+    if (model.provider == ApiProvider::OpenAIResponses) {
+        if (apiModel == QStringLiteral("gpt-5.5-pro")) {
+            return {"Medium", "High", "Extra High"};
+        }
+        return effortOptions();
+    }
+
+    if (model.provider == ApiProvider::NvidiaChat) {
+        if (apiModel == QStringLiteral("nvidia/nemotron-3-ultra-550b-a55b")
+            || apiModel == QStringLiteral("openai/gpt-oss-20b")
+            || apiModel == QStringLiteral("openai/gpt-oss-120b")) {
+            return {"Instant", "Medium", "High"};
+        }
+        if (apiModel == QStringLiteral("z-ai/glm-5.2")) {
+            return {"Default"};
+        }
+        return effortOptions();
+    }
+
+    if (apiModel == QStringLiteral("z-ai/glm-5.2")) {
+        return {"High", "Extra High"};
+    }
+    if (apiModel == QStringLiteral("google/gemini-3.5-flash")
+        || apiModel == QStringLiteral("google/gemini-3.1-flash-lite")
+        || apiModel == QStringLiteral("~google/gemini-pro-latest")
+        || apiModel == QStringLiteral("openai/gpt-oss-20b")) {
+        return {"Instant", "Medium", "High"};
+    }
+    if (apiModel == QStringLiteral("moonshotai/kimi-k2.6")
+        || apiModel == QStringLiteral("google/gemma-4-26b-a4b-it:free")) {
+        return {"Default"};
+    }
+    return effortOptions();
+}
+
 QString ModelCatalog::providerName(ApiProvider provider)
 {
     switch (provider) {
@@ -186,16 +225,81 @@ QString ModelCatalog::openRouterReasoningEffort(const QString &effort)
     return "medium";
 }
 
-QString ModelCatalog::nvidiaReasoningEffort(const QString &effort)
+QString ModelCatalog::reasoningEffort(const ModelInfo &model, const QString &effort)
 {
+    const QString apiModel = model.apiModel.trimmed().toLower();
     const QString normalized = effort.trimmed().toLower();
-    if (normalized == "instant") {
-        return "none";
+
+    if (model.provider == ApiProvider::OpenAIResponses) {
+        if (apiModel == QStringLiteral("gpt-5.5-pro")) {
+            if (normalized == QStringLiteral("extra high")) {
+                return QStringLiteral("xhigh");
+            }
+            return normalized == QStringLiteral("high")
+                ? QStringLiteral("high")
+                : QStringLiteral("medium");
+        }
+        if (normalized == QStringLiteral("instant")) {
+            return QStringLiteral("none");
+        }
+        return openAIReasoningEffort(effort);
     }
-    if (normalized == "pro" || normalized == "extra high") {
-        return "max";
+
+    if (model.provider == ApiProvider::NvidiaChat) {
+        if (apiModel == QStringLiteral("nvidia/nemotron-3-ultra-550b-a55b")) {
+            if (normalized == QStringLiteral("instant")) {
+                return QStringLiteral("none");
+            }
+            return normalized == QStringLiteral("medium")
+                ? QStringLiteral("medium")
+                : QStringLiteral("high");
+        }
+        if (apiModel == QStringLiteral("openai/gpt-oss-20b")
+            || apiModel == QStringLiteral("openai/gpt-oss-120b")) {
+            if (normalized == QStringLiteral("instant")) {
+                return QStringLiteral("low");
+            }
+            return normalized == QStringLiteral("medium")
+                ? QStringLiteral("medium")
+                : QStringLiteral("high");
+        }
+        return {};
     }
-    return "high";
+
+    if (apiModel == QStringLiteral("moonshotai/kimi-k2.6")
+        || apiModel == QStringLiteral("google/gemma-4-26b-a4b-it:free")) {
+        return {};
+    }
+    if (apiModel == QStringLiteral("z-ai/glm-5.2")) {
+        return normalized == QStringLiteral("extra high")
+            ? QStringLiteral("xhigh")
+            : QStringLiteral("high");
+    }
+    if (apiModel == QStringLiteral("google/gemini-3.5-flash")
+        || apiModel == QStringLiteral("google/gemini-3.1-flash-lite")) {
+        if (normalized == QStringLiteral("instant")) {
+            return QStringLiteral("minimal");
+        }
+        return normalized == QStringLiteral("high")
+            ? QStringLiteral("high")
+            : QStringLiteral("medium");
+    }
+    if (apiModel == QStringLiteral("~google/gemini-pro-latest")
+        || apiModel == QStringLiteral("openai/gpt-oss-20b")) {
+        if (normalized == QStringLiteral("instant")) {
+            return QStringLiteral("low");
+        }
+        return normalized == QStringLiteral("high")
+            ? QStringLiteral("high")
+            : QStringLiteral("medium");
+    }
+    if (apiModel.startsWith(QStringLiteral("openai/gpt-5.6-"))) {
+        if (normalized == QStringLiteral("instant")) {
+            return QStringLiteral("none");
+        }
+        return openRouterReasoningEffort(effort);
+    }
+    return openRouterReasoningEffort(effort);
 }
 
 QString ModelCatalog::textVerbosity(const QString &effort)
