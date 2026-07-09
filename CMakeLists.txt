@@ -5,7 +5,9 @@ project(MyChatty VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
-set(QT_SKIP_AUTO_PLUGIN_INCLUSION ON)
+if(NOT IOS)
+    set(QT_SKIP_AUTO_PLUGIN_INCLUSION ON)
+endif()
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Network Qml Quick QuickControls2 QuickDialogs2 Test WebView)
 
