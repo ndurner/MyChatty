@@ -18,8 +18,21 @@ static QString renderInline(QString text)
     text = escapeHtml(std::move(text));
     text.replace(QRegularExpression("&lt;br\\s*/?&gt;", QRegularExpression::CaseInsensitiveOption), "<br/>");
 
-    text.replace(QRegularExpression("`([^`]+)`"),
-                 "<code style=\"font-family:Menlo, Consolas, monospace; background-color:#f1f1f1;\">\\1</code>");
+    // Protect code spans while applying the other inline rules. In particular,
+    // underscores inside code must not be interpreted as emphasis markers.
+    QStringList codeSpans;
+    const QRegularExpression inlineCode("`([^`\\n]+)`");
+    qsizetype codeOffset = 0;
+    while (true) {
+        const QRegularExpressionMatch match = inlineCode.match(text, codeOffset);
+        if (!match.hasMatch()) {
+            break;
+        }
+        const QString placeholder = QString("\u0001CODE%1\u0002").arg(codeSpans.size());
+        codeSpans.append(match.captured(1));
+        text.replace(match.capturedStart(), match.capturedLength(), placeholder);
+        codeOffset = match.capturedStart() + placeholder.size();
+    }
     text.replace(QRegularExpression("!\\[([^\\]]*)\\]\\((https?://[^\\s)]+)\\)"),
                  "<a href=\"\\2\">\\1</a>");
     text.replace(QRegularExpression("\\[([^\\]]+)\\]\\((https?://[^\\s)]+)\\)"),
@@ -54,6 +67,12 @@ static QString renderInline(QString text)
     text.replace(QRegularExpression("(?<!\\*)\\*([^*]+)\\*(?!\\*)"), "<em>\\1</em>");
     text.replace(QRegularExpression("(?<!_)_([^_]+)_(?!_)"), "<em>\\1</em>");
     text.replace(QRegularExpression("~~([^~]+)~~"), "<s>\\1</s>");
+
+    for (qsizetype i = 0; i < codeSpans.size(); ++i) {
+        text.replace(QString("\u0001CODE%1\u0002").arg(i),
+                     "<span style=\"font-family:Menlo, Consolas, monospace; "
+                     "background-color:#f1f1f1;\">" + codeSpans.at(i) + "</span>");
+    }
     return text;
 }
 
@@ -227,7 +246,11 @@ static QVariantList parseBlocks(const QString &markdown)
     const QStringList lines = markdown.split('\n');
     for (int lineIndex = 0; lineIndex < lines.size(); ++lineIndex) {
         QString line = lines.at(lineIndex);
-        if (line.startsWith("```")) {
+        const QString fenceCandidate = line.trimmed();
+        const bool tripleFence = fenceCandidate.startsWith("```");
+        const bool doubleFence = !tripleFence
+            && QRegularExpression("^``[A-Za-z0-9_+.-]*$").match(fenceCandidate).hasMatch();
+        if (tripleFence || doubleFence || (inCodeFence && fenceCandidate == "``")) {
             if (inCodeFence) {
                 QVariantMap row = block("code");
                 row["text"] = code.trimmed();

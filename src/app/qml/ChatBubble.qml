@@ -23,6 +23,42 @@ Item {
         return text.length > 0 && text !== "Thought"
     }
 
+    function displayReasoning(value) {
+        var lines = (value || "").trim().split(/\r?\n/)
+        var output = []
+        var current = ""
+
+        function flush() {
+            if (current.length > 0) {
+                output.push(current)
+                current = ""
+            }
+        }
+
+        for (var i = 0; i < lines.length; ++i) {
+            var line = lines[i].trim()
+            if (line.length === 0)
+                continue
+
+            var isListItem = /^([-*+]\s+|\d+[.)]\s+)/.test(line)
+            var isStructure = isListItem || /^(#{1,6}\s+|```|>\s*)/.test(line)
+            if (isStructure) {
+                flush()
+                output.push(line)
+            } else if (output.length > 0 && /^([-*+]\s+|\d+[.)]\s+)/.test(output[output.length - 1])) {
+                output[output.length - 1] += " " + line
+            } else {
+                current += (current.length > 0 ? " " : "") + line
+            }
+        }
+        flush()
+        return output.join("\n")
+    }
+
+    function openLink(link) {
+        Qt.openUrlExternally(link)
+    }
+
     width: ListView.view ? ListView.view.width : 400
     visible: !root.toolOnly
     implicitHeight: root.toolOnly ? 0 : bubbleColumn.implicitHeight + 18
@@ -181,7 +217,7 @@ Item {
             TextEdit {
                 visible: root.hasUsefulReasoning(reasoning)
                 width: parent.width
-                text: reasoning.trim()
+                text: root.displayReasoning(reasoning)
                 textFormat: TextEdit.PlainText
                 wrapMode: TextEdit.WordWrap
                 readOnly: true
@@ -481,6 +517,7 @@ Item {
             selectByKeyboard: true
             color: "#111111"
             font.pixelSize: 21
+            onLinkActivated: function(link) { root.openLink(link) }
         }
     }
 
@@ -498,6 +535,7 @@ Item {
             color: "#111111"
             font.pixelSize: Math.max(20, 29 - block.level * 2)
             font.weight: Font.Bold
+            onLinkActivated: function(link) { root.openLink(link) }
         }
     }
 
@@ -567,6 +605,7 @@ Item {
                 selectByKeyboard: true
                 color: "#555555"
                 font.pixelSize: 20
+                onLinkActivated: function(link) { root.openLink(link) }
             }
         }
     }
@@ -609,6 +648,7 @@ Item {
                         selectByKeyboard: true
                         color: "#111111"
                         font.pixelSize: 21
+                        onLinkActivated: function(link) { root.openLink(link) }
                     }
                 }
             }
@@ -653,6 +693,7 @@ Item {
                                 font.pixelSize: 15
                                 font.weight: Font.Bold
                                 color: "#111111"
+                                onLinkActivated: function(link) { root.openLink(link) }
                             }
                         }
                     }
@@ -682,6 +723,7 @@ Item {
                                     selectByKeyboard: true
                                     font.pixelSize: 15
                                     color: "#111111"
+                                    onLinkActivated: function(link) { root.openLink(link) }
                                 }
                             }
                         }

@@ -692,6 +692,34 @@ private slots:
         QVERIFY(html.contains("<a href=\"https://example.org\">Item</a>"));
     }
 
+    void markdownKeepsInlineCodeLiteralAndSameSized()
+    {
+        const QString html = MarkdownRenderer::render("Use `namespace_tools` and `model_providers.<id>`.");
+        QVERIFY(!html.contains("font-size:"));
+        QVERIFY(html.contains(">namespace_tools</span>"));
+        QVERIFY(html.contains(">model_providers.&lt;id&gt;</span>"));
+        QVERIFY(!html.contains("<em>tools</em>"));
+    }
+
+    void markdownRepairsConservativeDoubleBacktickFence()
+    {
+        const QVariantList blocks = MarkdownRenderer::renderBlocks(
+            "``toml\n[model_providers.openrouter]\nnamespace_tools = false\n``");
+        QCOMPARE(blocks.size(), 1);
+        QCOMPARE(blocks.first().toMap().value("type").toString(), QString("code"));
+        QVERIFY(blocks.first().toMap().value("text").toString().contains("namespace_tools = false"));
+
+        const QVariantList indented = MarkdownRenderer::renderBlocks(
+            "- Provider config:\n\n"
+            "  ``toml\n"
+            "  [model_providers.openrouter]\n"
+            "  namespace_tools = false\n"
+            "  ``\n\n"
+            "- Next item");
+        QCOMPARE(indented.at(1).toMap().value("type").toString(), QString("code"));
+        QVERIFY(indented.at(1).toMap().value("text").toString().contains("namespace_tools = false"));
+    }
+
     void sseParserCombinesDataLines()
     {
         SseParser parser;
