@@ -20,6 +20,11 @@
 
 namespace MyChatty {
 
+// Temporary override for long-running tool workflows. Set this to false
+// to restore the safety limit below.
+static constexpr bool UnlimitedToolCallDepth = true;
+static constexpr int MaxToolCallDepth = 4;
+
 static QString trimmedTitle(QString title)
 {
     title = title.simplified();
@@ -730,7 +735,7 @@ void ChatController::resetStreamBuffer()
 
 bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvider provider, int toolDepth)
 {
-    if (toolDepth >= 4 || result.rawOutputItems.isEmpty()) {
+    if ((!UnlimitedToolCallDepth && toolDepth >= MaxToolCallDepth) || result.rawOutputItems.isEmpty()) {
         return false;
     }
 
