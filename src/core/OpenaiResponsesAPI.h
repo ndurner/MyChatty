@@ -9,6 +9,7 @@ class OpenaiResponsesAPI : public ApiClient {
     Q_OBJECT
 public:
     explicit OpenaiResponsesAPI(QObject *parent = nullptr);
+    explicit OpenaiResponsesAPI(QNetworkAccessManager *network, QObject *parent = nullptr);
 
     void send(const ChatRequest &request) override;
 
@@ -24,6 +25,7 @@ private:
     SseParser m_parser;
     ChatResult m_result;
     QByteArray m_responseBody;
+    QString m_pendingError;
     bool m_done = false;
 };
 

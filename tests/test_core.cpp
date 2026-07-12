@@ -273,7 +273,7 @@ private slots:
         QVERIFY(payload.value("instructions").toString().contains("Be terse."));
     }
 
-    void responsesApiReportsNestedFailureMessage()
+    void responsesApiDefersFailureUntilNetworkReplyFinishes()
     {
         OpenaiResponsesAPI client;
         QSignalSpy failed(&client, &ApiClient::failed);
@@ -290,8 +290,7 @@ private slots:
             Qt::DirectConnection,
             Q_ARG(QString, QStringLiteral("response.failed")),
             Q_ARG(QByteArray, QJsonDocument(event).toJson(QJsonDocument::Compact))));
-        QCOMPARE(failed.count(), 1);
-        QCOMPARE(failed.first().first().toString(), QString("The requested model does not exist."));
+        QCOMPARE(failed.count(), 0);
     }
 
     void responsesPayloadSupportsNativeWebSearch()

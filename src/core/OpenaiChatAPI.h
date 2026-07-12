@@ -13,6 +13,7 @@ class OpenaiChatAPI : public ApiClient {
     Q_OBJECT
 public:
     explicit OpenaiChatAPI(QObject *parent = nullptr);
+    explicit OpenaiChatAPI(QNetworkAccessManager *network, QObject *parent = nullptr);
 
     void send(const ChatRequest &request) override;
 
@@ -26,6 +27,7 @@ private:
     QByteArray m_responseBody;
     QJsonArray m_reasoningDetails;
     QMap<int, QJsonObject> m_toolCalls;
+    QString m_pendingError;
     bool m_done = false;
     bool m_stream = true;
 };

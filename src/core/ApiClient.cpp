@@ -7,7 +7,16 @@ namespace MyChatty {
 
 ApiClient::ApiClient(QObject *parent)
     : QObject(parent)
+    , m_ownedNetwork(std::make_unique<QNetworkAccessManager>())
+    , m_network(m_ownedNetwork.get())
 {
+}
+
+ApiClient::ApiClient(QNetworkAccessManager *network, QObject *parent)
+    : QObject(parent)
+    , m_network(network)
+{
+    Q_ASSERT(m_network);
 }
 
 void ApiClient::cancel()

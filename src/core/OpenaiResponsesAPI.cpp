@@ -11,15 +11,22 @@ OpenaiResponsesAPI::OpenaiResponsesAPI(QObject *parent)
     connect(&m_parser, &SseParser::eventReceived, this, &OpenaiResponsesAPI::handleEvent);
 }
 
+OpenaiResponsesAPI::OpenaiResponsesAPI(QNetworkAccessManager *network, QObject *parent)
+    : ApiClient(network, parent)
+{
+    connect(&m_parser, &SseParser::eventReceived, this, &OpenaiResponsesAPI::handleEvent);
+}
+
 void OpenaiResponsesAPI::send(const ChatRequest &request)
 {
     m_done = false;
     m_result = {};
     m_responseBody.clear();
+    m_pendingError.clear();
 
     QNetworkRequest networkRequest = jsonRequest(QUrl("https://api.openai.com/v1/responses"), request.apiKey);
     const QByteArray body = QJsonDocument(buildOpenaiResponsesPayload(request)).toJson(QJsonDocument::Compact);
-    m_reply = m_network.post(networkRequest, body);
+    m_reply = m_network->post(networkRequest, body);
 
     connect(m_reply, &QNetworkReply::readyRead, this, [this]() {
         if (!m_reply) {
@@ -38,7 +45,6 @@ void OpenaiResponsesAPI::send(const ChatRequest &request)
 void OpenaiResponsesAPI::handleEvent(const QString &eventName, const QByteArray &data)
 {
     if (data.trimmed() == "[DONE]") {
-        completeIfNeeded();
         return;
     }
 
@@ -81,14 +87,13 @@ void OpenaiResponsesAPI::handleEvent(const QString &eventName, const QByteArray 
         emit toolEvent(object);
     } else if (type == "response.completed") {
         absorbCompletedResponse(object.value("response").toObject());
-        completeIfNeeded();
     } else if (type == "response.failed" || type == "error") {
         QJsonObject error = object.value("error").toObject();
         if (error.isEmpty()) {
             error = object.value("response").toObject().value("error").toObject();
         }
         const QString message = error.value("message").toString(object.value("message").toString());
-        emit failed(message.isEmpty() ? QStringLiteral("OpenAI request failed") : message);
+        m_pendingError = message.isEmpty() ? QStringLiteral("OpenAI request failed") : message;
     }
 }
 
@@ -109,14 +114,21 @@ void OpenaiResponsesAPI::finishFromReply()
         m_parser.finish();
     }
 
-    if (m_reply->error() != QNetworkReply::NoError && !m_done) {
-        emit failed(networkErrorText(m_reply, m_responseBody));
-        m_reply->deleteLater();
+    QNetworkReply *reply = m_reply;
+    const QString networkError = reply->error() != QNetworkReply::NoError
+        ? networkErrorText(reply, m_responseBody) : QString();
+    reply->deleteLater();
+    m_reply.clear();
+
+    if (!m_pendingError.isEmpty() || !networkError.isEmpty()) {
+        m_done = true;
+        emit failed(!m_pendingError.isEmpty() ? m_pendingError : networkError);
+        emit settled();
         return;
     }
 
     completeIfNeeded();
-    m_reply->deleteLater();
+    emit settled();
 }
 
 void OpenaiResponsesAPI::completeIfNeeded()

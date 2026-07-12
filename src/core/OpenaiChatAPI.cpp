@@ -11,6 +11,12 @@ OpenaiChatAPI::OpenaiChatAPI(QObject *parent)
     connect(&m_parser, &SseParser::eventReceived, this, &OpenaiChatAPI::handleEvent);
 }
 
+OpenaiChatAPI::OpenaiChatAPI(QNetworkAccessManager *network, QObject *parent)
+    : ApiClient(network, parent)
+{
+    connect(&m_parser, &SseParser::eventReceived, this, &OpenaiChatAPI::handleEvent);
+}
+
 void OpenaiChatAPI::send(const ChatRequest &request)
 {
     m_done = false;
@@ -18,6 +24,7 @@ void OpenaiChatAPI::send(const ChatRequest &request)
     m_responseBody.clear();
     m_reasoningDetails = {};
     m_toolCalls.clear();
+    m_pendingError.clear();
     m_stream = request.stream;
 
     const bool nvidia = request.model.provider == ApiProvider::NvidiaChat;
@@ -31,7 +38,7 @@ void OpenaiChatAPI::send(const ChatRequest &request)
     }
 
     const QByteArray body = QJsonDocument(buildOpenaiChatPayload(request)).toJson(QJsonDocument::Compact);
-    m_reply = m_network.post(networkRequest, body);
+    m_reply = m_network->post(networkRequest, body);
 
     connect(m_reply, &QNetworkReply::readyRead, this, [this]() {
         if (!m_reply) {
@@ -52,7 +59,6 @@ void OpenaiChatAPI::send(const ChatRequest &request)
 void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
 {
     if (data.trimmed() == "[DONE]") {
-        completeIfNeeded();
         return;
     }
 
@@ -69,8 +75,7 @@ void OpenaiChatAPI::handleEvent(const QString &, const QByteArray &data)
         if (message.isEmpty()) {
             message = error.value("message").toString(QStringLiteral("Chat completions request failed"));
         }
-        m_done = true;
-        emit failed(message);
+        m_pendingError = message;
         return;
     }
 
@@ -145,13 +150,7 @@ void OpenaiChatAPI::finishFromReply()
         }
     }
 
-    if (m_reply->error() != QNetworkReply::NoError && !m_done) {
-        emit failed(networkErrorText(m_reply, m_responseBody));
-        m_reply->deleteLater();
-        return;
-    }
-
-    if (!m_stream && !m_done) {
+    if (!m_stream) {
         const QJsonDocument doc = QJsonDocument::fromJson(m_responseBody);
         const QJsonObject object = doc.object();
         if (object.contains("error")) {
@@ -160,41 +159,52 @@ void OpenaiChatAPI::finishFromReply()
             if (message.isEmpty()) {
                 message = error.value("message").toString(QStringLiteral("Chat completions request failed"));
             }
-            m_done = true;
-            emit failed(message);
-            m_reply->deleteLater();
-            return;
-        }
-        m_result.rawResponse = object;
-        m_result.usage = object.value("usage").toObject();
-        const QJsonArray choices = object.value("choices").toArray();
-        for (const QJsonValue &choiceValue : choices) {
-            const QJsonObject message = choiceValue.toObject().value("message").toObject();
-            const QString reasoning = message.value("reasoning_content").toString(message.value("reasoning").toString());
-            if (!reasoning.isEmpty()) {
-                m_result.reasoning += reasoning;
-                emit reasoningDelta(reasoning);
-            }
-            const QString content = message.value("content").toString();
-            if (!content.isEmpty()) {
-                m_result.text += content;
-                emit textDelta(content);
-            }
-            if (message.contains("tool_calls")) {
-                QJsonObject assistant{
-                    {"role", "assistant"},
-                    {"content", content},
-                    {"tool_calls", message.value("tool_calls").toArray()},
-                };
+            m_pendingError = message;
+        } else {
+            m_result.rawResponse = object;
+            m_result.usage = object.value("usage").toObject();
+            const QJsonArray choices = object.value("choices").toArray();
+            for (const QJsonValue &choiceValue : choices) {
+                const QJsonObject message = choiceValue.toObject().value("message").toObject();
+                const QString reasoning = message.value("reasoning_content").toString(message.value("reasoning").toString());
                 if (!reasoning.isEmpty()) {
-                    assistant["reasoning"] = reasoning;
+                    m_result.reasoning += reasoning;
+                    emit reasoningDelta(reasoning);
                 }
-                m_result.rawOutputItems.append(assistant);
+                const QString content = message.value("content").toString();
+                if (!content.isEmpty()) {
+                    m_result.text += content;
+                    emit textDelta(content);
+                }
+                if (message.contains("tool_calls")) {
+                    QJsonObject assistant{
+                        {"role", "assistant"},
+                        {"content", content},
+                        {"tool_calls", message.value("tool_calls").toArray()},
+                    };
+                    if (!reasoning.isEmpty()) {
+                        assistant["reasoning"] = reasoning;
+                    }
+                    m_result.rawOutputItems.append(assistant);
+                }
             }
         }
     }
+
+    QNetworkReply *reply = m_reply;
+    const QString networkError = reply->error() != QNetworkReply::NoError
+        ? networkErrorText(reply, m_responseBody) : QString();
+    reply->deleteLater();
+    m_reply.clear();
+
+    if (!m_pendingError.isEmpty() || !networkError.isEmpty()) {
+        m_done = true;
+        emit failed(!m_pendingError.isEmpty() ? m_pendingError : networkError);
+        emit settled();
+        return;
+    }
     completeIfNeeded();
-    m_reply->deleteLater();
+    emit settled();
 }
 
 void OpenaiChatAPI::completeIfNeeded()

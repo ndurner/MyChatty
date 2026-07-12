@@ -96,6 +96,7 @@ private:
     void flushStreamDeltas();
     void completePendingRequestIfReady();
     void resetStreamBuffer();
+    void retireClient();
     void ensureCurrentConversationId();
     void importAttachmentsToWorkspace(const QList<Attachment> &attachments);
     void persistCurrentConversation();
@@ -125,6 +126,7 @@ private:
     QString m_selectedReasoningMode = "Standard";
     bool m_busy = false;
     QString m_toast;
+    QNetworkAccessManager m_network;
     std::unique_ptr<ApiClient> m_client;
     SpeechService m_speech;
 

@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkAccessManager>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
@@ -220,11 +221,12 @@ int main(int argc, char *argv[])
     }
 
     std::unique_ptr<ApiClient> client;
+    QNetworkAccessManager network;
     if (model.provider == ApiProvider::OpenRouterChat
         || model.provider == ApiProvider::NvidiaChat) {
-        client = std::make_unique<OpenaiChatAPI>();
+        client = std::make_unique<OpenaiChatAPI>(&network);
     } else {
-        client = std::make_unique<OpenaiResponsesAPI>();
+        client = std::make_unique<OpenaiResponsesAPI>(&network);
     }
 
     int exitCode = 0;

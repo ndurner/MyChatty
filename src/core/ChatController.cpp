@@ -571,9 +571,9 @@ void ChatController::beginRequest(const ChatRequest &request, int assistantRow, 
     setBusy(true);
     if (request.model.provider == ApiProvider::OpenRouterChat
         || request.model.provider == ApiProvider::NvidiaChat) {
-        m_client = std::make_unique<OpenaiChatAPI>();
+        m_client = std::make_unique<OpenaiChatAPI>(&m_network);
     } else {
-        m_client = std::make_unique<OpenaiResponsesAPI>();
+        m_client = std::make_unique<OpenaiResponsesAPI>(&m_network);
     }
 
     connect(m_client.get(), &ApiClient::textDelta, this, [this, assistantRow](const QString &delta) {
@@ -731,6 +731,18 @@ void ChatController::resetStreamBuffer()
     m_pendingReasoningDelta.clear();
     m_hasPendingCompletion = false;
     m_pendingCompletionResult = {};
+}
+
+void ChatController::retireClient()
+{
+    ApiClient *client = m_client.release();
+    if (!client) {
+        return;
+    }
+    client->disconnect(this);
+    client->setParent(this);
+    connect(client, &ApiClient::settled, client, &QObject::deleteLater);
+    client->cancel();
 }
 
 bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvider provider, int toolDepth)
@@ -956,7 +968,7 @@ void ChatController::amendUserMessage(int row, const QString &text)
 void ChatController::forkConversation(int row)
 {
     if (m_busy && m_client) {
-        m_client->cancel();
+        retireClient();
     }
     resetStreamBuffer();
     setBusy(false);
@@ -1078,7 +1090,7 @@ void ChatController::importAttachmentsToWorkspace(const QList<Attachment> &attac
 void ChatController::newChat()
 {
     if (m_busy && m_client) {
-        m_client->cancel();
+        retireClient();
     }
     resetStreamBuffer();
     setBusy(false);
@@ -1093,7 +1105,7 @@ void ChatController::loadConversation(const QString &id)
     for (const Conversation &conversation : m_conversations) {
         if (conversation.id == id) {
             if (m_busy && m_client) {
-                m_client->cancel();
+                retireClient();
                 setBusy(false);
             }
             resetStreamBuffer();
@@ -1134,7 +1146,7 @@ void ChatController::clearToast()
 void ChatController::loadDemoConversation()
 {
     if (m_busy && m_client) {
-        m_client->cancel();
+        retireClient();
     }
     resetStreamBuffer();
     setBusy(false);
