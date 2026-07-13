@@ -27,7 +27,7 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.leftMargin: 18
         anchors.rightMargin: 18
-        anchors.topMargin: 48
+        anchors.topMargin: Math.max(12, SafeArea.margins.top)
         height: 58
         spacing: 14
         z: 2
@@ -126,7 +126,7 @@ ApplicationWindow {
         anchors.bottom: parent.bottom
         anchors.leftMargin: 14
         anchors.rightMargin: 14
-        anchors.bottomMargin: 22
+        anchors.bottomMargin: 8
         height: composer.implicitHeight
         z: 3
 
@@ -233,6 +233,8 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        if (Qt.platform.os === "ios" || Qt.platform.os === "android")
+            window.showFullScreen()
         if (initialUiState === "selector")
             selector.open()
         else if (initialUiState === "selector-model") {
