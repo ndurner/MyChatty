@@ -15,7 +15,7 @@ QList<ModelInfo> ModelCatalog::models()
         {"5.6 Terra", "GPT-5.6 Terra", "openai/gpt-5.6-terra", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
         {"5.6 Luna", "GPT-5.6 Luna", "openai/gpt-5.6-luna", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
         {"GLM-5.2", "GLM-5.2", "z-ai/glm-5.2", ApiProvider::OpenRouterChat, "OpenRouter", {"Parasail"}, false, false},
-        {"Kimi K2.6", "Kimi K2.6", "moonshotai/kimi-k2.6", ApiProvider::OpenRouterChat, "OpenRouter", {"Moonshot AI"}, true, false},
+        {"Kimi K2.6", "Kimi K2.6", "moonshotai/kimi-k2.6", ApiProvider::OpenRouterChat, "OpenRouter", {"NovitaAI"}, true, false},
         {"Gemini 3.5 Flash", "Gemini 3.5 Flash", "google/gemini-3.5-flash", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
         {"Gemini Flash Lite", "Gemini Flash Lite", "google/gemini-3.1-flash-lite", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
         {"Gemini Pro Latest", "Gemini Pro Latest", "~google/gemini-pro-latest", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
