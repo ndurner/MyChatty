@@ -113,6 +113,13 @@ ApplicationWindow {
     Connections {
         target: chatController
 
+        function onUserMessageSubmitted(row) {
+            Qt.callLater(function() {
+                chatList.forceLayout()
+                chatList.positionViewAtIndex(row, ListView.Contain)
+            })
+        }
+
         function onToolApprovalRequested(row) {
             Qt.callLater(function() {
                 chatList.forceLayout()

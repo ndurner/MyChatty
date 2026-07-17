@@ -423,6 +423,7 @@ void ChatController::sendMessage(const QString &text)
     m_pendingAttachments.clear();
     emit pendingAttachmentsChanged();
     m_messages.append(user);
+    emit userMessageSubmitted(m_messages.rowCount() - 1);
 
     appendAssistantAndBeginRequest();
 }
