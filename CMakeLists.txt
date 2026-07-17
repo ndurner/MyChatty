@@ -16,6 +16,8 @@ qt_standard_project_setup(REQUIRES 6.8)
 add_library(mychatty_core STATIC
     src/core/ApiClient.cpp
     src/core/ApiClient.h
+    src/core/ApiProtocolAdapter.cpp
+    src/core/ApiProtocolAdapter.h
     src/core/ChatController.cpp
     src/core/ChatController.h
     src/core/ChatMessageModel.cpp

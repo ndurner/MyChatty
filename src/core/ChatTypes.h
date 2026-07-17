@@ -76,6 +76,12 @@ struct ChatResult {
     QJsonObject usage;
 };
 
+struct ToolCall {
+    QString id;
+    QString name;
+    QJsonObject arguments;
+};
+
 } // namespace MyChatty
 
 Q_DECLARE_METATYPE(MyChatty::ChatResult)

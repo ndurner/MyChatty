@@ -1,5 +1,7 @@
 #include "OpenaiChatAPI.h"
 
+#include "ApiProtocolAdapter.h"
+
 #include <QJsonDocument>
 #include <QNetworkReply>
 
@@ -27,17 +29,14 @@ void OpenaiChatAPI::send(const ChatRequest &request)
     m_pendingError.clear();
     m_stream = request.stream;
 
-    const bool nvidia = request.model.provider == ApiProvider::NvidiaChat;
-    QNetworkRequest networkRequest = jsonRequest(
-        QUrl(nvidia ? QStringLiteral("https://integrate.api.nvidia.com/v1/chat/completions")
-                   : QStringLiteral("https://openrouter.ai/api/v1/chat/completions")),
-        request.apiKey);
-    if (!nvidia) {
+    const ProviderProfile &profile = providerProfile(request.model.provider);
+    QNetworkRequest networkRequest = jsonRequest(QUrl(profile.endpoint), request.apiKey);
+    if (profile.sendsOpenRouterAttribution) {
         networkRequest.setRawHeader("HTTP-Referer", "https://github.com/ndurner/MyChatty");
         networkRequest.setRawHeader("X-Title", "MyChatty");
     }
 
-    const QByteArray body = QJsonDocument(buildOpenaiChatPayload(request)).toJson(QJsonDocument::Compact);
+    const QByteArray body = QJsonDocument(profile.protocol->buildPayload(request)).toJson(QJsonDocument::Compact);
     m_reply = m_network->post(networkRequest, body);
 
     connect(m_reply, &QNetworkReply::readyRead, this, [this]() {

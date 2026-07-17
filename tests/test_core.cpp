@@ -1,4 +1,5 @@
 #include "ApiClient.h"
+#include "ApiProtocolAdapter.h"
 #include "ChatSerializer.h"
 #include "ChatController.h"
 #include "ChatTypes.h"
@@ -16,6 +17,33 @@
 
 using namespace MyChatty;
 
+namespace MyChatty {
+
+class ChatControllerTestAccess {
+public:
+    static bool continueAfterToolCalls(ChatController &controller, const ChatResult &result, ApiProvider provider)
+    {
+        return controller.continueAfterToolCalls(result, provider, 0);
+    }
+
+    static QString pendingCallId(const ChatController &controller)
+    {
+        return controller.m_pendingToolApproval.call.id;
+    }
+
+    static int pendingRemainingCallCount(const ChatController &controller)
+    {
+        return controller.m_pendingToolApproval.batch.remainingCalls.size();
+    }
+
+    static QJsonArray pendingCompletedOutputs(const ChatController &controller)
+    {
+        return controller.m_pendingToolApproval.batch.completedOutputs;
+    }
+};
+
+} // namespace MyChatty
+
 class ApiClientProbe : public ApiClient {
 public:
     using ApiClient::networkErrorText;
@@ -27,6 +55,21 @@ class CoreTests : public QObject {
     Q_OBJECT
 
 private slots:
+    void providerProfilesShareProtocolsWithoutSharingVendorConfiguration()
+    {
+        const ProviderProfile &openAI = providerProfile(ApiProvider::OpenAIResponses);
+        const ProviderProfile &openRouter = providerProfile(ApiProvider::OpenRouterChat);
+        const ProviderProfile &nvidia = providerProfile(ApiProvider::NvidiaChat);
+
+        QVERIFY(openAI.protocol != openRouter.protocol);
+        QCOMPARE(openRouter.protocol, nvidia.protocol);
+        QVERIFY(openAI.endpoint.contains(QStringLiteral("api.openai.com")));
+        QVERIFY(openRouter.endpoint.contains(QStringLiteral("openrouter.ai")));
+        QVERIFY(nvidia.endpoint.contains(QStringLiteral("nvidia.com")));
+        QVERIFY(openRouter.sendsOpenRouterAttribution);
+        QVERIFY(!nvidia.sendsOpenRouterAttribution);
+    }
+
     void modelCatalogContainsRequestedModels()
     {
         QCOMPARE(ModelCatalog::modelForProviderAndDisplayName("OpenAI", "5.6 Sol").apiModel,
@@ -271,6 +314,75 @@ private slots:
         QVERIFY(payload.contains("reasoning"));
         QCOMPARE(payload.value("reasoning").toObject().value("effort").toString(), QString("high"));
         QVERIFY(payload.value("instructions").toString().contains("Be terse."));
+    }
+
+    void responsesPayloadReplaysAllFunctionOutputs()
+    {
+        ChatMessage assistant;
+        assistant.role = "assistant";
+        assistant.rawOutputItems = QJsonArray{
+            QJsonObject{{"type", "function_call"}, {"name", "open_web_page"}, {"call_id", "call_1"}, {"arguments", "{\"url\":\"https://example.com\"}"}},
+            QJsonObject{{"type", "function_call"}, {"name", "read_web_page_text"}, {"call_id", "call_2"}, {"arguments", "{}"}},
+        };
+
+        ChatMessage firstOutput;
+        firstOutput.role = "assistant";
+        firstOutput.rawOutputItems = QJsonArray{QJsonObject{{"type", "function_call_output"}, {"call_id", "call_1"}, {"output", "first"}}};
+        ChatMessage secondOutput;
+        secondOutput.role = "assistant";
+        secondOutput.rawOutputItems = QJsonArray{QJsonObject{{"type", "function_call_output"}, {"call_id", "call_2"}, {"output", "second"}}};
+
+        ChatRequest request;
+        request.history = {assistant, firstOutput, secondOutput};
+        request.model = ModelCatalog::modelForDisplayName("5.4-mini");
+        const QJsonArray input = buildOpenaiResponsesPayload(request).value("input").toArray();
+        QCOMPARE(input.size(), 4);
+        QCOMPARE(input.at(2).toObject().value("call_id").toString(), QString("call_1"));
+        QCOMPARE(input.at(3).toObject().value("call_id").toString(), QString("call_2"));
+    }
+
+    void toolApprovalPreservesRemainingCallsForBothApiShapes()
+    {
+        const auto verify = [](ApiProvider provider, const ChatResult &result) {
+            ChatController controller(nullptr);
+            QVERIFY(ChatControllerTestAccess::continueAfterToolCalls(controller, result, provider));
+            QCOMPARE(ChatControllerTestAccess::pendingCallId(controller), QString("call_1"));
+            QCOMPARE(ChatControllerTestAccess::pendingRemainingCallCount(controller), 1);
+            QCOMPARE(ChatControllerTestAccess::pendingCompletedOutputs(controller).size(), 0);
+
+            const int firstApprovalRow = controller.messages()->rowCount() - 1;
+            controller.resolveToolApproval(firstApprovalRow, QStringLiteral("no"));
+
+            QCOMPARE(ChatControllerTestAccess::pendingCallId(controller), QString("call_2"));
+            QCOMPARE(ChatControllerTestAccess::pendingRemainingCallCount(controller), 0);
+            const QJsonArray completed = ChatControllerTestAccess::pendingCompletedOutputs(controller);
+            QCOMPARE(completed.size(), 1);
+            const QJsonObject output = completed.first().toObject();
+            if (provider == ApiProvider::OpenAIResponses) {
+                QCOMPARE(output.value("type").toString(), QString("function_call_output"));
+                QCOMPARE(output.value("call_id").toString(), QString("call_1"));
+            } else {
+                QCOMPARE(output.value("role").toString(), QString("tool"));
+                QCOMPARE(output.value("tool_call_id").toString(), QString("call_1"));
+            }
+        };
+
+        ChatResult responsesResult;
+        responsesResult.rawOutputItems = QJsonArray{
+            QJsonObject{{"type", "function_call"}, {"name", "open_web_page"}, {"call_id", "call_1"}, {"arguments", "{\"url\":\"https://one.invalid\"}"}},
+            QJsonObject{{"type", "function_call"}, {"name", "open_web_page"}, {"call_id", "call_2"}, {"arguments", "{\"url\":\"https://two.invalid\"}"}},
+        };
+        verify(ApiProvider::OpenAIResponses, responsesResult);
+
+        ChatResult chatResult;
+        chatResult.rawOutputItems = QJsonArray{QJsonObject{
+            {"role", "assistant"},
+            {"tool_calls", QJsonArray{
+                QJsonObject{{"id", "call_1"}, {"type", "function"}, {"function", QJsonObject{{"name", "open_web_page"}, {"arguments", "{\"url\":\"https://one.invalid\"}"}}}},
+                QJsonObject{{"id", "call_2"}, {"type", "function"}, {"function", QJsonObject{{"name", "open_web_page"}, {"arguments", "{\"url\":\"https://two.invalid\"}"}}}},
+            }},
+        }};
+        verify(ApiProvider::OpenRouterChat, chatResult);
     }
 
     void responsesApiDefersFailureUntilNetworkReplyFinishes()

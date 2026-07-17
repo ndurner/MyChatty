@@ -1,5 +1,7 @@
 #include "ChatTypes.h"
 
+#include "ApiProtocolAdapter.h"
+
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
@@ -415,7 +417,7 @@ static QJsonObject chatFunctionTool(const QJsonObject &responsesTool)
     };
 }
 
-QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
+QJsonObject OpenAIResponsesProtocolAdapter::buildPayload(const ChatRequest &request) const
 {
     QJsonArray input;
     for (const ChatMessage &message : request.history) {
@@ -496,7 +498,7 @@ QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
     return body;
 }
 
-QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
+QJsonObject ChatCompletionsProtocolAdapter::buildPayload(const ChatRequest &request) const
 {
     QJsonArray messages;
     QString systemInstructions = request.customInstructions.trimmed();
@@ -602,6 +604,16 @@ QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
         };
     }
     return body;
+}
+
+QJsonObject buildOpenaiResponsesPayload(const ChatRequest &request)
+{
+    return protocolAdapter(ApiProvider::OpenAIResponses).buildPayload(request);
+}
+
+QJsonObject buildOpenaiChatPayload(const ChatRequest &request)
+{
+    return protocolAdapter(ApiProvider::OpenRouterChat).buildPayload(request);
 }
 
 } // namespace MyChatty

@@ -13,6 +13,8 @@
 
 namespace MyChatty {
 
+class ChatControllerTestAccess;
+
 class ChatController : public QObject {
     Q_OBJECT
     Q_PROPERTY(QAbstractItemModel *messages READ messages CONSTANT)
@@ -89,8 +91,6 @@ private:
     void appendAssistantAndBeginRequest();
     void beginRequest(const ChatRequest &request, int assistantRow, int toolDepth);
     bool continueAfterToolCalls(const ChatResult &result, ApiProvider provider, int toolDepth);
-    bool requestWebApprovalIfNeeded(ApiProvider provider, int toolDepth, const QString &callId, const QString &name, const QJsonObject &arguments);
-    void appendToolOutputAndContinue(ApiProvider provider, int toolDepth, const QString &callId, const QJsonObject &output);
     void queueTextDelta(int assistantRow, const QString &delta);
     void queueReasoningDelta(int assistantRow, const QString &delta);
     void flushStreamDeltas();
@@ -105,15 +105,27 @@ private:
     QString titleForConversation() const;
     ChatMessage *assistantMessageAt(int row);
 
+    struct ToolBatch {
+        ApiProvider provider = ApiProvider::OpenRouterChat;
+        int depth = 0;
+        QList<ToolCall> remainingCalls;
+        QJsonArray completedOutputs;
+    };
+
     struct PendingToolApproval {
         bool active = false;
         QString approvalId;
-        ApiProvider provider = ApiProvider::OpenRouterChat;
-        int toolDepth = 0;
-        QString callId;
-        QString name;
-        QJsonObject arguments;
+        ToolCall call;
+        ToolBatch batch;
     };
+
+    ToolBatch toolBatchForResult(const ChatResult &result, ApiProvider provider, int toolDepth) const;
+    bool processToolBatch(ToolBatch batch);
+    bool webApprovalRequired(const ToolCall &call, QString *verifiedProvenance = nullptr) const;
+    void requestWebApproval(ToolBatch batch, const ToolCall &call, const QString &verifiedProvenance);
+    void appendToolOutputsAndContinue(const ToolBatch &batch);
+
+    friend class ChatControllerTestAccess;
 
     SettingsStore *m_settings = nullptr;
     ChatMessageModel m_messages;

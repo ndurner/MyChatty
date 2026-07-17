@@ -1,8 +1,7 @@
 #include "ApiClient.h"
+#include "ApiProtocolAdapter.h"
 #include "ChatTypes.h"
 #include "ModelCatalog.h"
-#include "OpenaiChatAPI.h"
-#include "OpenaiResponsesAPI.h"
 
 #include <QCommandLineParser>
 #include <QCoreApplication>
@@ -191,10 +190,8 @@ int main(int argc, char *argv[])
             ? nvidiaKey(parser.isSet("settings-keys"))
             : openAIKey(parser.isSet("settings-keys"));
 
-    const QJsonObject payload = (model.provider == ApiProvider::OpenRouterChat
-                                 || model.provider == ApiProvider::NvidiaChat)
-        ? buildOpenaiChatPayload(request)
-        : buildOpenaiResponsesPayload(request);
+    const ApiProtocolAdapter &adapter = protocolAdapter(model.provider);
+    const QJsonObject payload = adapter.buildPayload(request);
     if (parser.isSet("dry-run")) {
         QTextStream(stdout) << QJsonDocument(payload).toJson(QJsonDocument::Indented);
         return 0;
@@ -220,14 +217,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    std::unique_ptr<ApiClient> client;
     QNetworkAccessManager network;
-    if (model.provider == ApiProvider::OpenRouterChat
-        || model.provider == ApiProvider::NvidiaChat) {
-        client = std::make_unique<OpenaiChatAPI>(&network);
-    } else {
-        client = std::make_unique<OpenaiResponsesAPI>(&network);
-    }
+    std::unique_ptr<ApiClient> client = adapter.createClient(&network);
 
     int exitCode = 0;
     QElapsedTimer timer;

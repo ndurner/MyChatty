@@ -1,9 +1,8 @@
 #include "ChatController.h"
 
+#include "ApiProtocolAdapter.h"
 #include "ChatSerializer.h"
 #include "ConversationFileStore.h"
-#include "OpenaiChatAPI.h"
-#include "OpenaiResponsesAPI.h"
 #include "ToolExecutor.h"
 
 #include <QClipboard>
@@ -65,86 +64,6 @@ static bool hasImageAttachments(const QList<ChatMessage> &messages)
         }
     }
     return false;
-}
-
-static QJsonObject parseJsonObject(const QString &text)
-{
-    const QJsonDocument doc = QJsonDocument::fromJson(text.toUtf8());
-    return doc.isObject() ? doc.object() : QJsonObject{};
-}
-
-static QString imageDataUrl(const QString &path, const QString &mimeType)
-{
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        return {};
-    }
-    const QByteArray bytes = file.readAll();
-    if (bytes.isEmpty()) {
-        return {};
-    }
-    const QString type = mimeType.trimmed().isEmpty() ? QStringLiteral("image/png") : mimeType.trimmed();
-    return QStringLiteral("data:%1;base64,%2")
-        .arg(type, QString::fromLatin1(bytes.toBase64()));
-}
-
-static QJsonValue responsesFunctionOutput(const QJsonObject &output)
-{
-    const QString imagePath = output.value(QStringLiteral("image_path")).toString();
-    if (imagePath.isEmpty()) {
-        return QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact));
-    }
-
-    QJsonObject textObject = output;
-    textObject.remove(QStringLiteral("image_path"));
-    textObject.remove(QStringLiteral("image_mime_type"));
-    textObject.remove(QStringLiteral("image_detail"));
-
-    const QString dataUrl = imageDataUrl(imagePath, output.value(QStringLiteral("image_mime_type")).toString());
-    if (dataUrl.isEmpty()) {
-        return QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact));
-    }
-
-    return QJsonArray{
-        QJsonObject{
-            {QStringLiteral("type"), QStringLiteral("input_text")},
-            {QStringLiteral("text"), QString::fromUtf8(QJsonDocument(textObject).toJson(QJsonDocument::Compact))},
-        },
-        QJsonObject{
-            {QStringLiteral("type"), QStringLiteral("input_image")},
-            {QStringLiteral("image_url"), dataUrl},
-            {QStringLiteral("detail"), output.value(QStringLiteral("image_detail")).toString(QStringLiteral("high"))},
-        },
-    };
-}
-
-static QJsonValue chatToolOutput(const QJsonObject &output)
-{
-    const QString imagePath = output.value(QStringLiteral("image_path")).toString();
-    if (imagePath.isEmpty()) {
-        return QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact));
-    }
-
-    QJsonObject textObject = output;
-    textObject.remove(QStringLiteral("image_path"));
-    textObject.remove(QStringLiteral("image_mime_type"));
-    textObject.remove(QStringLiteral("image_detail"));
-
-    const QString dataUrl = imageDataUrl(imagePath, output.value(QStringLiteral("image_mime_type")).toString());
-    if (dataUrl.isEmpty()) {
-        return QString::fromUtf8(QJsonDocument(output).toJson(QJsonDocument::Compact));
-    }
-
-    return QJsonArray{
-        QJsonObject{
-            {QStringLiteral("type"), QStringLiteral("text")},
-            {QStringLiteral("text"), QString::fromUtf8(QJsonDocument(textObject).toJson(QJsonDocument::Compact))},
-        },
-        QJsonObject{
-            {QStringLiteral("type"), QStringLiteral("image_url")},
-            {QStringLiteral("image_url"), QJsonObject{{QStringLiteral("url"), dataUrl}}},
-        },
-    };
 }
 
 static bool isOpenWebPageCall(const QString &name)
@@ -569,12 +488,7 @@ void ChatController::beginRequest(const ChatRequest &request, int assistantRow, 
 {
     resetStreamBuffer();
     setBusy(true);
-    if (request.model.provider == ApiProvider::OpenRouterChat
-        || request.model.provider == ApiProvider::NvidiaChat) {
-        m_client = std::make_unique<OpenaiChatAPI>(&m_network);
-    } else {
-        m_client = std::make_unique<OpenaiResponsesAPI>(&m_network);
-    }
+    m_client = protocolAdapter(request.model.provider).createClient(&m_network);
 
     connect(m_client.get(), &ApiClient::textDelta, this, [this, assistantRow](const QString &delta) {
         queueTextDelta(assistantRow, delta);
@@ -751,74 +665,90 @@ bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvide
         return false;
     }
 
-    ToolExecutor executor(m_settings, m_currentConversationId);
-    QList<ChatMessage> toolMessages;
+    return processToolBatch(toolBatchForResult(result, provider, toolDepth));
+}
 
-    if (provider == ApiProvider::OpenAIResponses) {
-        for (const QJsonValue &itemValue : result.rawOutputItems) {
-            const QJsonObject item = itemValue.toObject();
-            if (item.value("type").toString() != QStringLiteral("function_call")) {
-                continue;
-            }
-            const QString name = item.value("name").toString();
-            const QString callId = item.value("call_id").toString();
-            if (name.isEmpty() || callId.isEmpty()) {
-                continue;
-            }
-            const QJsonObject arguments = parseJsonObject(item.value("arguments").toString());
-            if (requestWebApprovalIfNeeded(provider, toolDepth, callId, name, arguments)) {
-                return true;
-            }
-            const QJsonObject output = executor.execute(name, arguments);
+ChatController::ToolBatch ChatController::toolBatchForResult(const ChatResult &result, ApiProvider provider, int toolDepth) const
+{
+    ToolBatch batch;
+    batch.provider = provider;
+    batch.depth = toolDepth;
+    batch.remainingCalls = protocolAdapter(provider).extractToolCalls(result);
+    return batch;
+}
 
-            ChatMessage tool;
-            tool.id = newId("msg");
-            tool.role = "assistant";
-            tool.createdAt = QDateTime::currentDateTimeUtc();
-            tool.rawOutputItems = QJsonArray{QJsonObject{
-                {"type", "function_call_output"},
-                {"call_id", callId},
-                {"output", responsesFunctionOutput(output)},
-            }};
-            toolMessages.append(tool);
-        }
-    } else {
-        for (const QJsonValue &itemValue : result.rawOutputItems) {
-            const QJsonObject assistantItem = itemValue.toObject();
-            const QJsonArray calls = assistantItem.value("tool_calls").toArray();
-            for (const QJsonValue &callValue : calls) {
-                const QJsonObject call = callValue.toObject();
-                const QJsonObject function = call.value("function").toObject();
-                const QString name = function.value("name").toString();
-                const QString id = call.value("id").toString();
-                if (name.isEmpty() || id.isEmpty()) {
-                    continue;
-                }
-                const QJsonObject arguments = parseJsonObject(function.value("arguments").toString());
-                if (requestWebApprovalIfNeeded(provider, toolDepth, id, name, arguments)) {
-                    return true;
-                }
-                const QJsonObject output = executor.execute(name, arguments);
-
-                ChatMessage tool;
-                tool.id = newId("msg");
-                tool.role = "assistant";
-                tool.createdAt = QDateTime::currentDateTimeUtc();
-                tool.rawOutputItems = QJsonArray{QJsonObject{
-                    {"role", "tool"},
-                    {"tool_call_id", id},
-                    {"content", chatToolOutput(output)},
-                }};
-                toolMessages.append(tool);
-            }
-        }
-    }
-
-    if (toolMessages.isEmpty()) {
+bool ChatController::processToolBatch(ToolBatch batch)
+{
+    if (batch.remainingCalls.isEmpty() && batch.completedOutputs.isEmpty()) {
         return false;
     }
 
-    for (const ChatMessage &tool : toolMessages) {
+    ToolExecutor executor(m_settings, m_currentConversationId);
+    while (!batch.remainingCalls.isEmpty()) {
+        const ToolCall call = batch.remainingCalls.takeFirst();
+        QString verifiedProvenance;
+        if (webApprovalRequired(call, &verifiedProvenance)) {
+            requestWebApproval(std::move(batch), call, verifiedProvenance);
+            return true;
+        }
+        const QJsonObject output = executor.execute(call.name, call.arguments);
+        batch.completedOutputs.append(protocolAdapter(batch.provider).serializeToolOutput(call.id, output));
+    }
+
+    appendToolOutputsAndContinue(batch);
+    return true;
+}
+
+bool ChatController::webApprovalRequired(const ToolCall &call, QString *verifiedProvenance) const
+{
+    if (!isOpenWebPageCall(call.name)) {
+        return false;
+    }
+    const QString provenance = verifiedOpenWebPageProvenance(m_messages.messages(), call.arguments);
+    if (verifiedProvenance) {
+        *verifiedProvenance = provenance;
+    }
+    if (provenance == QStringLiteral("user_provided")
+        || provenance == QStringLiteral("web_search_result")) {
+        return false;
+    }
+    const QString host = hostForOpenWebPageArguments(call.arguments);
+    return host.isEmpty() || !m_alwaysApprovedWebHosts.contains(host);
+}
+
+void ChatController::requestWebApproval(ToolBatch batch, const ToolCall &call, const QString &verifiedProvenance)
+{
+    m_pendingToolApproval = {};
+    m_pendingToolApproval.active = true;
+    m_pendingToolApproval.approvalId = newId(QStringLiteral("approval"));
+    m_pendingToolApproval.call = call;
+    m_pendingToolApproval.batch = std::move(batch);
+
+    const QUrl url(call.arguments.value(QStringLiteral("url")).toString());
+    ChatMessage approvalMessage;
+    approvalMessage.id = newId("msg");
+    approvalMessage.role = "assistant";
+    approvalMessage.createdAt = QDateTime::currentDateTimeUtc();
+    approvalMessage.approval = QJsonObject{
+        {QStringLiteral("id"), m_pendingToolApproval.approvalId},
+        {QStringLiteral("type"), QStringLiteral("open_web_page")},
+        {QStringLiteral("status"), QStringLiteral("pending")},
+        {QStringLiteral("url"), url.toString()},
+        {QStringLiteral("host"), url.host().toLower()},
+        {QStringLiteral("verified_provenance"), verifiedProvenance},
+    };
+    m_messages.append(approvalMessage);
+    setToast(QStringLiteral("Web Browser approval needed."));
+}
+
+void ChatController::appendToolOutputsAndContinue(const ToolBatch &batch)
+{
+    for (const QJsonValue &outputValue : batch.completedOutputs) {
+        ChatMessage tool;
+        tool.id = newId("msg");
+        tool.role = "assistant";
+        tool.createdAt = QDateTime::currentDateTimeUtc();
+        tool.rawOutputItems = QJsonArray{outputValue};
         m_messages.append(tool);
     }
 
@@ -830,79 +760,7 @@ bool ChatController::continueAfterToolCalls(const ChatResult &result, ApiProvide
     m_messages.append(assistant);
     const int assistantRow = m_messages.rowCount() - 1;
 
-    beginRequest(makeRequest(), assistantRow, toolDepth + 1);
-    return true;
-}
-
-bool ChatController::requestWebApprovalIfNeeded(ApiProvider provider, int toolDepth, const QString &callId, const QString &name, const QJsonObject &arguments)
-{
-    if (!isOpenWebPageCall(name)) {
-        return false;
-    }
-    const QString verifiedProvenance = verifiedOpenWebPageProvenance(m_messages.messages(), arguments);
-    if (verifiedProvenance == QStringLiteral("user_provided")
-        || verifiedProvenance == QStringLiteral("web_search_result")) {
-        return false;
-    }
-    const QUrl url(arguments.value(QStringLiteral("url")).toString());
-    const QString host = url.host().toLower();
-    if (!host.isEmpty() && m_alwaysApprovedWebHosts.contains(host)) {
-        return false;
-    }
-    m_pendingToolApproval.active = true;
-    m_pendingToolApproval.approvalId = newId(QStringLiteral("approval"));
-    m_pendingToolApproval.provider = provider;
-    m_pendingToolApproval.toolDepth = toolDepth;
-    m_pendingToolApproval.callId = callId;
-    m_pendingToolApproval.name = name;
-    m_pendingToolApproval.arguments = arguments;
-
-    ChatMessage approvalMessage;
-    approvalMessage.id = newId("msg");
-    approvalMessage.role = "assistant";
-    approvalMessage.createdAt = QDateTime::currentDateTimeUtc();
-    approvalMessage.approval = QJsonObject{
-        {QStringLiteral("id"), m_pendingToolApproval.approvalId},
-        {QStringLiteral("type"), QStringLiteral("open_web_page")},
-        {QStringLiteral("status"), QStringLiteral("pending")},
-        {QStringLiteral("url"), url.toString()},
-        {QStringLiteral("host"), host},
-        {QStringLiteral("verified_provenance"), verifiedProvenance},
-    };
-    m_messages.append(approvalMessage);
-    setToast(QStringLiteral("Web Browser approval needed."));
-    return true;
-}
-
-void ChatController::appendToolOutputAndContinue(ApiProvider provider, int toolDepth, const QString &callId, const QJsonObject &output)
-{
-    ChatMessage tool;
-    tool.id = newId("msg");
-    tool.role = "assistant";
-    tool.createdAt = QDateTime::currentDateTimeUtc();
-    if (provider == ApiProvider::OpenAIResponses) {
-        tool.rawOutputItems = QJsonArray{QJsonObject{
-            {"type", "function_call_output"},
-            {"call_id", callId},
-            {"output", responsesFunctionOutput(output)},
-        }};
-    } else {
-        tool.rawOutputItems = QJsonArray{QJsonObject{
-            {"role", "tool"},
-            {"tool_call_id", callId},
-            {"content", chatToolOutput(output)},
-        }};
-    }
-    m_messages.append(tool);
-
-    ChatMessage assistant;
-    assistant.id = newId("msg");
-    assistant.role = "assistant";
-    assistant.createdAt = QDateTime::currentDateTimeUtc();
-    assistant.streaming = true;
-    m_messages.append(assistant);
-    const int assistantRow = m_messages.rowCount() - 1;
-    beginRequest(makeRequest(), assistantRow, toolDepth + 1);
+    beginRequest(makeRequest(), assistantRow, batch.depth + 1);
 }
 
 void ChatController::attachFiles(const QVariant &urls, const QString &origin)
@@ -971,6 +829,7 @@ void ChatController::forkConversation(int row)
         retireClient();
     }
     resetStreamBuffer();
+    m_pendingToolApproval = {};
     setBusy(false);
 
     const QList<ChatMessage> currentMessages = m_messages.messages();
@@ -1049,7 +908,7 @@ void ChatController::resolveToolApproval(int row, const QString &decision)
     m_pendingToolApproval = {};
 
     if (normalized == QStringLiteral("always")) {
-        const QString host = hostForOpenWebPageArguments(pending.arguments);
+        const QString host = hostForOpenWebPageArguments(pending.call.arguments);
         if (!host.isEmpty() && !m_alwaysApprovedWebHosts.contains(host)) {
             m_alwaysApprovedWebHosts.append(host);
         }
@@ -1063,9 +922,12 @@ void ChatController::resolveToolApproval(int row, const QString &decision)
         };
     } else {
         ToolExecutor executor(m_settings, m_currentConversationId);
-        output = executor.execute(pending.name, pending.arguments);
+        output = executor.execute(pending.call.name, pending.call.arguments);
     }
-    appendToolOutputAndContinue(pending.provider, pending.toolDepth, pending.callId, output);
+
+    ToolBatch batch = pending.batch;
+    batch.completedOutputs.append(protocolAdapter(batch.provider).serializeToolOutput(pending.call.id, output));
+    processToolBatch(std::move(batch));
 }
 
 void ChatController::ensureCurrentConversationId()
@@ -1093,6 +955,7 @@ void ChatController::newChat()
         retireClient();
     }
     resetStreamBuffer();
+    m_pendingToolApproval = {};
     setBusy(false);
     m_currentConversationId.clear();
     m_messages.clear();
@@ -1109,6 +972,7 @@ void ChatController::loadConversation(const QString &id)
                 setBusy(false);
             }
             resetStreamBuffer();
+            m_pendingToolApproval = {};
             m_currentConversationId = conversation.id;
             m_selectedModel = conversation.model;
             m_selectedProvider = conversation.provider.isEmpty()
@@ -1149,6 +1013,7 @@ void ChatController::loadDemoConversation()
         retireClient();
     }
     resetStreamBuffer();
+    m_pendingToolApproval = {};
     setBusy(false);
     m_currentConversationId.clear();
 

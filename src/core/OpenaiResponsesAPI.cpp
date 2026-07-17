@@ -1,5 +1,7 @@
 #include "OpenaiResponsesAPI.h"
 
+#include "ApiProtocolAdapter.h"
+
 #include <QJsonDocument>
 #include <QNetworkReply>
 
@@ -24,8 +26,9 @@ void OpenaiResponsesAPI::send(const ChatRequest &request)
     m_responseBody.clear();
     m_pendingError.clear();
 
-    QNetworkRequest networkRequest = jsonRequest(QUrl("https://api.openai.com/v1/responses"), request.apiKey);
-    const QByteArray body = QJsonDocument(buildOpenaiResponsesPayload(request)).toJson(QJsonDocument::Compact);
+    const ProviderProfile &profile = providerProfile(request.model.provider);
+    QNetworkRequest networkRequest = jsonRequest(QUrl(profile.endpoint), request.apiKey);
+    const QByteArray body = QJsonDocument(profile.protocol->buildPayload(request)).toJson(QJsonDocument::Compact);
     m_reply = m_network->post(networkRequest, body);
 
     connect(m_reply, &QNetworkReply::readyRead, this, [this]() {
