@@ -223,7 +223,6 @@ Popup {
                             }
                         }
                     }
-
                     Text {
                         text: "Advanced Settings"
                         color: "#969696"
@@ -256,6 +255,34 @@ Popup {
                                 anchors.verticalCenter: parent.verticalCenter
                                 checked: store.pageScreenshotsEnabled
                                 onToggled: store.pageScreenshotsEnabled = checked
+                            }
+                        }
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 76
+                        radius: 26
+                        color: "#ffffff"
+                        Item {
+                            anchors.fill: parent
+                            anchors.leftMargin: 22
+                            anchors.rightMargin: 18
+                            Text {
+                                anchors.left: parent.left
+                                anchors.right: alwaysApproveWebBrowserSwitch.left
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Always Approve Web Browser"
+                                color: "#111111"
+                                font.pixelSize: 22
+                                elide: Text.ElideRight
+                            }
+                            Switch {
+                                id: alwaysApproveWebBrowserSwitch
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                checked: store.webBrowserAlwaysApproved
+                                onToggled: store.webBrowserAlwaysApproved = checked
                             }
                         }
                     }

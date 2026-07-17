@@ -16,6 +16,7 @@ class SettingsStore : public QObject {
     Q_PROPERTY(bool exaSearchEnabled READ exaSearchEnabled WRITE setExaSearchEnabled NOTIFY exaSearchEnabledChanged)
     Q_PROPERTY(bool javaScriptUseEnabled READ javaScriptUseEnabled WRITE setJavaScriptUseEnabled NOTIFY javaScriptUseEnabledChanged)
     Q_PROPERTY(bool webBrowserEnabled READ webBrowserEnabled WRITE setWebBrowserEnabled NOTIFY webBrowserEnabledChanged)
+    Q_PROPERTY(bool webBrowserAlwaysApproved READ webBrowserAlwaysApproved WRITE setWebBrowserAlwaysApproved NOTIFY webBrowserAlwaysApprovedChanged)
     Q_PROPERTY(bool pageScreenshotsEnabled READ pageScreenshotsEnabled WRITE setPageScreenshotsEnabled NOTIFY pageScreenshotsEnabledChanged)
 public:
     explicit SettingsStore(QObject *parent = nullptr);
@@ -30,6 +31,7 @@ public:
     bool exaSearchEnabled() const;
     bool javaScriptUseEnabled() const;
     bool webBrowserEnabled() const;
+    bool webBrowserAlwaysApproved() const;
     bool pageScreenshotsEnabled() const;
 
     void setOpenAIKey(const QString &value);
@@ -42,6 +44,7 @@ public:
     void setExaSearchEnabled(bool value);
     void setJavaScriptUseEnabled(bool value);
     void setWebBrowserEnabled(bool value);
+    void setWebBrowserAlwaysApproved(bool value);
     void setPageScreenshotsEnabled(bool value);
 
     Q_INVOKABLE void save();
@@ -58,6 +61,7 @@ signals:
     void exaSearchEnabledChanged();
     void javaScriptUseEnabledChanged();
     void webBrowserEnabledChanged();
+    void webBrowserAlwaysApprovedChanged();
     void pageScreenshotsEnabledChanged();
 
 private:
@@ -71,6 +75,7 @@ private:
     bool m_exaSearchEnabled = false;
     bool m_javaScriptUseEnabled = false;
     bool m_webBrowserEnabled = false;
+    bool m_webBrowserAlwaysApproved = false;
     bool m_pageScreenshotsEnabled = false;
 };
 

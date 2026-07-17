@@ -22,6 +22,7 @@ static QJsonObject conversationToJson(const Conversation &conversation)
         {"model", conversation.model},
         {"effort", conversation.effort},
         {"reasoningMode", conversation.reasoningMode},
+        {"webBrowserAlwaysApproved", conversation.webBrowserAlwaysApproved},
         {"createdAt", conversation.createdAt.toUTC().toString(Qt::ISODateWithMs)},
         {"updatedAt", conversation.updatedAt.toUTC().toString(Qt::ISODateWithMs)},
         {"messages", messages},
@@ -40,6 +41,7 @@ static Conversation conversationFromJson(const QJsonObject &object)
     }
     conversation.effort = object.value("effort").toString("Medium");
     conversation.reasoningMode = object.value("reasoningMode").toString("Standard");
+    conversation.webBrowserAlwaysApproved = object.value("webBrowserAlwaysApproved").toBool(false);
     if (!object.contains("reasoningMode")
         && conversation.effort.compare(QStringLiteral("Pro"), Qt::CaseInsensitive) == 0) {
         const ModelInfo model = ModelCatalog::modelForProviderAndDisplayName(

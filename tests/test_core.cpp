@@ -40,6 +40,27 @@ public:
     {
         return controller.m_pendingToolApproval.batch.completedOutputs;
     }
+
+    static bool webApprovalRequired(const ChatController &controller, const QString &url)
+    {
+        ToolCall call;
+        call.name = QStringLiteral("open_web_page");
+        call.arguments = QJsonObject{
+            {QStringLiteral("url"), url},
+            {QStringLiteral("url_provenance"), QStringLiteral("model_constructed")},
+        };
+        return controller.webApprovalRequired(call);
+    }
+
+    static void alwaysApproveWebBrowser(ChatController &controller)
+    {
+        controller.m_conversationWebBrowserAlwaysApproved = true;
+    }
+
+    static void setConversations(ChatController &controller, const QList<Conversation> &conversations)
+    {
+        controller.m_conversations = conversations;
+    }
 };
 
 } // namespace MyChatty
@@ -383,6 +404,38 @@ private slots:
             }},
         }};
         verify(ApiProvider::OpenRouterChat, chatResult);
+    }
+
+    void alwaysApprovalAppliesOnlyToCurrentConversation()
+    {
+        ChatController controller(nullptr);
+        QVERIFY(ChatControllerTestAccess::webApprovalRequired(controller, QStringLiteral("https://one.invalid")));
+
+        ChatControllerTestAccess::alwaysApproveWebBrowser(controller);
+
+        QVERIFY(!ChatControllerTestAccess::webApprovalRequired(controller, QStringLiteral("https://one.invalid/elsewhere")));
+        QVERIFY(!ChatControllerTestAccess::webApprovalRequired(controller, QStringLiteral("https://www.two.invalid")));
+
+        controller.newChat();
+        QVERIFY(ChatControllerTestAccess::webApprovalRequired(controller, QStringLiteral("https://one.invalid")));
+
+        Conversation approvedConversation;
+        approvedConversation.id = QStringLiteral("approved-conversation");
+        approvedConversation.webBrowserAlwaysApproved = true;
+        ChatControllerTestAccess::setConversations(controller, {approvedConversation});
+        controller.loadConversation(approvedConversation.id);
+        QVERIFY(!ChatControllerTestAccess::webApprovalRequired(controller, QStringLiteral("https://three.invalid")));
+    }
+
+    void globalAlwaysApprovalSettingAppliesToEveryConversation()
+    {
+        SettingsStore settings;
+        settings.setWebBrowserAlwaysApproved(true);
+        ChatController controller(&settings);
+        QVERIFY(!ChatControllerTestAccess::webApprovalRequired(controller, QStringLiteral("https://one.invalid")));
+
+        controller.newChat();
+        QVERIFY(!ChatControllerTestAccess::webApprovalRequired(controller, QStringLiteral("https://two.invalid")));
     }
 
     void responsesApiDefersFailureUntilNetworkReplyFinishes()

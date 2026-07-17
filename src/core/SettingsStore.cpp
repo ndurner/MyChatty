@@ -60,6 +60,11 @@ bool SettingsStore::webBrowserEnabled() const
     return m_webBrowserEnabled;
 }
 
+bool SettingsStore::webBrowserAlwaysApproved() const
+{
+    return m_webBrowserAlwaysApproved;
+}
+
 bool SettingsStore::pageScreenshotsEnabled() const
 {
     return m_pageScreenshotsEnabled;
@@ -156,6 +161,15 @@ void SettingsStore::setWebBrowserEnabled(bool value)
     emit webBrowserEnabledChanged();
 }
 
+void SettingsStore::setWebBrowserAlwaysApproved(bool value)
+{
+    if (m_webBrowserAlwaysApproved == value) {
+        return;
+    }
+    m_webBrowserAlwaysApproved = value;
+    emit webBrowserAlwaysApprovedChanged();
+}
+
 void SettingsStore::setPageScreenshotsEnabled(bool value)
 {
     if (m_pageScreenshotsEnabled == value) {
@@ -178,6 +192,7 @@ void SettingsStore::save()
     settings.setValue("exaSearchEnabled", m_exaSearchEnabled);
     settings.setValue("javaScriptUseEnabled", m_javaScriptUseEnabled);
     settings.setValue("webBrowserEnabled", m_webBrowserEnabled);
+    settings.setValue("webBrowserAlwaysApproved", m_webBrowserAlwaysApproved);
     settings.setValue("pageScreenshotsEnabled", m_pageScreenshotsEnabled);
 }
 
@@ -197,6 +212,7 @@ void SettingsStore::reload()
     m_exaSearchEnabled = settings.value("exaSearchEnabled", false).toBool();
     m_javaScriptUseEnabled = settings.value("javaScriptUseEnabled", false).toBool();
     m_webBrowserEnabled = settings.value("webBrowserEnabled", false).toBool();
+    m_webBrowserAlwaysApproved = settings.value("webBrowserAlwaysApproved", false).toBool();
     m_pageScreenshotsEnabled = settings.value("pageScreenshotsEnabled", false).toBool();
     emit openAIKeyChanged();
     emit openRouterKeyChanged();
@@ -208,6 +224,7 @@ void SettingsStore::reload()
     emit exaSearchEnabledChanged();
     emit javaScriptUseEnabledChanged();
     emit webBrowserEnabledChanged();
+    emit webBrowserAlwaysApprovedChanged();
     emit pageScreenshotsEnabledChanged();
 }
 

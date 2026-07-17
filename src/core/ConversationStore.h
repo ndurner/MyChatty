@@ -14,6 +14,7 @@ struct Conversation {
     QString model;
     QString effort;
     QString reasoningMode = QStringLiteral("Standard");
+    bool webBrowserAlwaysApproved = false;
     QDateTime createdAt;
     QDateTime updatedAt;
     QList<ChatMessage> messages;

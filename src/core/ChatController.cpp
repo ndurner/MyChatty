@@ -71,11 +71,6 @@ static bool isOpenWebPageCall(const QString &name)
     return name == QStringLiteral("open_web_page");
 }
 
-static QString hostForOpenWebPageArguments(const QJsonObject &arguments)
-{
-    return QUrl(arguments.value(QStringLiteral("url")).toString()).host().toLower();
-}
-
 static QString normalizedComparableUrl(const QString &text)
 {
     QUrl url(text.trimmed());
@@ -712,8 +707,8 @@ bool ChatController::webApprovalRequired(const ToolCall &call, QString *verified
         || provenance == QStringLiteral("web_search_result")) {
         return false;
     }
-    const QString host = hostForOpenWebPageArguments(call.arguments);
-    return host.isEmpty() || !m_alwaysApprovedWebHosts.contains(host);
+    const bool globallyApproved = m_settings && m_settings->webBrowserAlwaysApproved();
+    return !globallyApproved && !m_conversationWebBrowserAlwaysApproved;
 }
 
 void ChatController::requestWebApproval(ToolBatch batch, const ToolCall &call, const QString &verifiedProvenance)
@@ -846,6 +841,7 @@ void ChatController::forkConversation(int row)
 
     const QString previousConversationId = m_currentConversationId;
     m_currentConversationId = newId("conv");
+    m_conversationWebBrowserAlwaysApproved = false;
     m_messages.setMessages(forkedMessages);
     m_pendingAttachments.clear();
     emit pendingAttachmentsChanged();
@@ -908,10 +904,8 @@ void ChatController::resolveToolApproval(int row, const QString &decision)
     m_pendingToolApproval = {};
 
     if (normalized == QStringLiteral("always")) {
-        const QString host = hostForOpenWebPageArguments(pending.call.arguments);
-        if (!host.isEmpty() && !m_alwaysApprovedWebHosts.contains(host)) {
-            m_alwaysApprovedWebHosts.append(host);
-        }
+        m_conversationWebBrowserAlwaysApproved = true;
+        persistCurrentConversation();
     }
 
     QJsonObject output;
@@ -958,6 +952,7 @@ void ChatController::newChat()
     m_pendingToolApproval = {};
     setBusy(false);
     m_currentConversationId.clear();
+    m_conversationWebBrowserAlwaysApproved = false;
     m_messages.clear();
     m_pendingAttachments.clear();
     emit pendingAttachmentsChanged();
@@ -974,6 +969,7 @@ void ChatController::loadConversation(const QString &id)
             resetStreamBuffer();
             m_pendingToolApproval = {};
             m_currentConversationId = conversation.id;
+            m_conversationWebBrowserAlwaysApproved = conversation.webBrowserAlwaysApproved;
             m_selectedModel = conversation.model;
             m_selectedProvider = conversation.provider.isEmpty()
                 ? ModelCatalog::modelForDisplayName(conversation.model).providerLabel
@@ -1016,6 +1012,7 @@ void ChatController::loadDemoConversation()
     m_pendingToolApproval = {};
     setBusy(false);
     m_currentConversationId.clear();
+    m_conversationWebBrowserAlwaysApproved = false;
 
     ChatMessage user;
     user.id = newId("msg");
@@ -1069,6 +1066,7 @@ void ChatController::persistCurrentConversation()
     conversation.provider = m_selectedProvider;
     conversation.effort = m_selectedEffort;
     conversation.reasoningMode = m_selectedReasoningMode;
+    conversation.webBrowserAlwaysApproved = m_conversationWebBrowserAlwaysApproved;
     conversation.createdAt = QDateTime::currentDateTimeUtc();
     conversation.updatedAt = QDateTime::currentDateTimeUtc();
     conversation.messages = m_messages.messages();

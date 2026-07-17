@@ -152,7 +152,7 @@ private:
     ApiProvider m_pendingCompletionProvider = ApiProvider::OpenRouterChat;
     int m_pendingCompletionToolDepth = 0;
     PendingToolApproval m_pendingToolApproval;
-    QStringList m_alwaysApprovedWebHosts;
+    bool m_conversationWebBrowserAlwaysApproved = false;
 };
 
 } // namespace MyChatty
