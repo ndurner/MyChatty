@@ -184,7 +184,7 @@ ApplicationWindow {
         controller: chatController
         onOpened: {
             if (initialUiState !== "selector-model")
-                modelMode = false
+                page = "effort"
         }
     }
 
@@ -256,7 +256,7 @@ ApplicationWindow {
         if (initialUiState === "selector")
             selector.open()
         else if (initialUiState === "selector-model") {
-            selector.modelMode = true
+            selector.page = "models"
             selector.open()
         }
         else if (initialUiState === "sidebar")

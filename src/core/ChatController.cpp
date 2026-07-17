@@ -440,7 +440,7 @@ void ChatController::appendAssistantAndBeginRequest()
 
     const ChatRequest request = makeRequest();
     if (hasImageAttachments(request.history) && !request.model.supportsImages) {
-        assistant.text = QStringLiteral("%1 does not support image input. Choose Gemma 4 Free or Kimi K2.6 for image analysis.")
+        assistant.text = QStringLiteral("%1 does not support image input. Choose Gemma 4 Free, Kimi K2.6, or Kimi K3 for image analysis.")
                              .arg(request.model.displayName);
         assistant.streaming = false;
         m_messages.update(assistantRow, assistant);

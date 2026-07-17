@@ -32,7 +32,7 @@ without duplicating request serialization or streaming parsing code.
 - Two-level provider/model selector for OpenAI, OpenRouter, and NVIDIA.
 - Model catalog entries for GPT-5.5, GPT-5.4 mini, GPT-5.5 Pro, OpenRouter
   models, and live-tested NVIDIA NIM models.
-- OpenRouter provider pinning for GLM-5.2 and Kimi K2.6.
+- OpenRouter provider pinning for GLM-5.2, Kimi K2.6, and Kimi K3.
 - Settings for OpenAI, OpenRouter, NVIDIA, and Exa API keys plus Custom
   instructions.
 - Web search settings for provider-backed search and optional
@@ -241,7 +241,8 @@ The built-in model catalog currently contains:
 | GPT-5.6 Terra | `openai/gpt-5.6-terra` | OpenRouter | |
 | GPT-5.6 Luna | `openai/gpt-5.6-luna` | OpenRouter | |
 | GLM-5.2 | `z-ai/glm-5.2` | OpenRouter | Parasail |
-| Kimi K2.6 | `moonshotai/kimi-k2.6` | OpenRouter | Moonshot AI |
+| Kimi K2.6 | `moonshotai/kimi-k2.6` | OpenRouter | NovitaAI |
+| Kimi K3 | `moonshotai/kimi-k3` | OpenRouter | Moonshot AI |
 | Gemini 3.5 Flash | `google/gemini-3.5-flash` | OpenRouter | |
 | Gemini Flash Lite | `google/gemini-3.1-flash-lite` | OpenRouter | |
 | Gemini Pro Latest | `~google/gemini-pro-latest` | OpenRouter | |

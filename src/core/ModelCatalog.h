@@ -23,6 +23,7 @@ struct ModelInfo {
     bool supportsImages = true;
     bool supportsFiles = false;
     QJsonObject chatParameters;
+    QString countryFlag;
 };
 
 class ModelCatalog {

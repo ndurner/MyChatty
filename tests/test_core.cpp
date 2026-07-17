@@ -116,8 +116,28 @@ private slots:
         const ModelInfo kimi = ModelCatalog::modelForDisplayName("Kimi K2.6");
         QCOMPARE(kimi.apiModel, QString("moonshotai/kimi-k2.6"));
         QCOMPARE(kimi.provider, ApiProvider::OpenRouterChat);
-        QCOMPARE(kimi.providerOnly, QStringList{"Moonshot AI"});
+        QCOMPARE(kimi.providerOnly, QStringList{"NovitaAI"});
+        QCOMPARE(kimi.countryFlag, QString("🇺🇸"));
         QVERIFY(kimi.supportsImages);
+        const ModelInfo kimiK3 = ModelCatalog::modelForDisplayName("Kimi K3");
+        QCOMPARE(kimiK3.apiModel, QString("moonshotai/kimi-k3"));
+        QCOMPARE(kimiK3.provider, ApiProvider::OpenRouterChat);
+        QCOMPARE(kimiK3.providerOnly, QStringList{"Moonshot AI"});
+        QCOMPARE(kimiK3.countryFlag, QString("🇨🇳"));
+        QVERIFY(kimiK3.supportsImages);
+        QVERIFY(!kimiK3.supportsFiles);
+
+        const QVariantList openRouterOptions = ModelCatalog::modelOptionsForProvider("OpenRouter");
+        const auto optionFor = [&openRouterOptions](const QString &displayName) {
+            for (const QVariant &option : openRouterOptions) {
+                if (option.toMap().value("displayName").toString() == displayName) {
+                    return option.toMap();
+                }
+            }
+            return QVariantMap{};
+        };
+        QCOMPARE(optionFor("Kimi K2.6").value("countryFlag").toString(), QString("🇺🇸"));
+        QCOMPARE(optionFor("Kimi K3").value("countryFlag").toString(), QString("🇨🇳"));
         const ModelInfo gemma = ModelCatalog::modelForDisplayName("Gemma 4 Free");
         QCOMPARE(gemma.apiModel, QString("google/gemma-4-26b-a4b-it:free"));
         QCOMPARE(gemma.provider, ApiProvider::OpenRouterChat);
@@ -248,6 +268,7 @@ private slots:
         verify("OpenRouter", "Gemini Pro Latest", {{"Instant", "low"}, {"Medium", "medium"}, {"High", "high"}});
         verify("OpenRouter", "GPT OSS 20B", {{"Instant", "low"}, {"Medium", "medium"}, {"High", "high"}});
         verify("OpenRouter", "Kimi K2.6", {{"Default", ""}});
+        verify("OpenRouter", "Kimi K3", {{"Default", ""}});
         verify("OpenRouter", "Gemma 4 Free", {{"Default", ""}});
 
         verify("NVIDIA", "Nemotron 3 Ultra 550B A55B", {{"Instant", "none"}, {"Medium", "medium"}, {"High", "high"}});

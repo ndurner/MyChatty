@@ -10,7 +10,6 @@ Popup {
     dim: false
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-    onOpened: page = "effort"
     width: Math.min(300, parent ? parent.width - 72 : 300)
     height: page === "models" ? 548 : 512
     x: parent ? (parent.width - width) / 2 : 80
@@ -272,13 +271,27 @@ Popup {
                             }
                             Text {
                                 anchors.left: modelCheck.right
-                                anchors.right: parent.right
+                                anchors.right: modelFlag.left
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.displayName
                                 font.pixelSize: 20
                                 color: "#111111"
                                 verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
+                            }
+                            Text {
+                                id: modelFlag
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: modelData.countryFlag.length > 0 ? 34 : 0
+                                visible: modelData.countryFlag.length > 0
+                                text: modelData.countryFlag
+                                font.family: (Qt.platform.os === "osx" || Qt.platform.os === "ios")
+                                             ? "Apple Color Emoji" : ""
+                                font.pixelSize: 22
+                                renderType: Text.NativeRendering
+                                horizontalAlignment: Text.AlignRight
+                                verticalAlignment: Text.AlignVCenter
                             }
                         }
                     }
