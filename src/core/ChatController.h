@@ -82,6 +82,7 @@ signals:
     void selectorLabelChanged();
     void busyChanged();
     void toastChanged();
+    void toolApprovalRequested(int row);
 
 private:
     void setBusy(bool value);

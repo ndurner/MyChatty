@@ -110,6 +110,17 @@ ApplicationWindow {
         }
     }
 
+    Connections {
+        target: chatController
+
+        function onToolApprovalRequested(row) {
+            Qt.callLater(function() {
+                chatList.forceLayout()
+                chatList.positionViewAtIndex(row, ListView.Contain)
+            })
+        }
+    }
+
     Item {
         id: emptySpace
         anchors.left: parent.left

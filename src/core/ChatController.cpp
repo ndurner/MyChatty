@@ -733,6 +733,7 @@ void ChatController::requestWebApproval(ToolBatch batch, const ToolCall &call, c
         {QStringLiteral("verified_provenance"), verifiedProvenance},
     };
     m_messages.append(approvalMessage);
+    emit toolApprovalRequested(m_messages.rowCount() - 1);
     setToast(QStringLiteral("Web Browser approval needed."));
 }
 

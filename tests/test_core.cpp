@@ -366,7 +366,10 @@ private slots:
     {
         const auto verify = [](ApiProvider provider, const ChatResult &result) {
             ChatController controller(nullptr);
+            QSignalSpy approvalRequested(&controller, &ChatController::toolApprovalRequested);
             QVERIFY(ChatControllerTestAccess::continueAfterToolCalls(controller, result, provider));
+            QCOMPARE(approvalRequested.count(), 1);
+            QCOMPARE(approvalRequested.first().first().toInt(), controller.messages()->rowCount() - 1);
             QCOMPARE(ChatControllerTestAccess::pendingCallId(controller), QString("call_1"));
             QCOMPARE(ChatControllerTestAccess::pendingRemainingCallCount(controller), 1);
             QCOMPARE(ChatControllerTestAccess::pendingCompletedOutputs(controller).size(), 0);
@@ -374,6 +377,8 @@ private slots:
             const int firstApprovalRow = controller.messages()->rowCount() - 1;
             controller.resolveToolApproval(firstApprovalRow, QStringLiteral("no"));
 
+            QCOMPARE(approvalRequested.count(), 2);
+            QCOMPARE(approvalRequested.last().first().toInt(), controller.messages()->rowCount() - 1);
             QCOMPARE(ChatControllerTestAccess::pendingCallId(controller), QString("call_2"));
             QCOMPARE(ChatControllerTestAccess::pendingRemainingCallCount(controller), 0);
             const QJsonArray completed = ChatControllerTestAccess::pendingCompletedOutputs(controller);
