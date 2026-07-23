@@ -4,8 +4,13 @@ import QtQuick.Controls
 Item {
     id: fieldRoot
     property string label
-    property alias text: input.text
-    signal edited()
+    property string value: ""
+    signal edited(string value)
+
+    onValueChanged: {
+        if (input.text !== value)
+            input.text = value
+    }
 
     height: 84
     Column {
@@ -29,7 +34,13 @@ Item {
             placeholderTextColor: "#9a9a9a"
             selectedTextColor: "#ffffff"
             selectionColor: "#111111"
-            onTextEdited: fieldRoot.edited()
+            // TextEdited misses some iOS text insertion paths, notably paste
+            // and credential autofill. Keep the backing settings value in sync
+            // for every change while avoiding a feedback loop on reload.
+            onTextChanged: {
+                if (text !== fieldRoot.value)
+                    fieldRoot.edited(text)
+            }
             leftPadding: 14
             rightPadding: 14
             background: Rectangle {

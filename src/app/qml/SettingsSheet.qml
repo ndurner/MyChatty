@@ -127,26 +127,26 @@ Popup {
                             LabeledSecretField {
                                 width: parent.width
                                 label: "OpenAI API Key"
-                                text: store.openAIKey
-                                onEdited: store.openAIKey = text
+                                value: store.openAIKey
+                                onEdited: value => store.openAIKey = value
                             }
                             LabeledSecretField {
                                 width: parent.width
                                 label: "OpenRouter API Key"
-                                text: store.openRouterKey
-                                onEdited: store.openRouterKey = text
+                                value: store.openRouterKey
+                                onEdited: value => store.openRouterKey = value
                             }
                             LabeledSecretField {
                                 width: parent.width
                                 label: "NVIDIA API Key"
-                                text: store.nvidiaKey
-                                onEdited: store.nvidiaKey = text
+                                value: store.nvidiaKey
+                                onEdited: value => store.nvidiaKey = value
                             }
                             LabeledSecretField {
                                 width: parent.width
                                 label: "Exa API Key"
-                                text: store.exaKey
-                                onEdited: store.exaKey = text
+                                value: store.exaKey
+                                onEdited: value => store.exaKey = value
                             }
                         }
                     }
