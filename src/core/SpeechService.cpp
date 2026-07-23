@@ -29,6 +29,10 @@ void SpeechService::speak(const QString &text, const QString &apiKey)
     }
 
     QNetworkRequest request(QUrl("https://api.openai.com/v1/audio/speech"));
+#if defined(Q_OS_IOS)
+    // Keep the iOS transport workaround consistent with chat requests.
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+#endif
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
     const QJsonObject body{

@@ -29,6 +29,12 @@ void ApiClient::cancel()
 QNetworkRequest ApiClient::jsonRequest(const QUrl &url, const QString &apiKey)
 {
     QNetworkRequest request(url);
+#if defined(Q_OS_IOS)
+    // Qt's HTTP/2 connection can lose its HPACK header-compression state on
+    // iOS. Both OpenAI and OpenRouter then fail before either service receives
+    // a usable request. HTTP/1.1 avoids that shared transport failure.
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+#endif
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
     return request;
