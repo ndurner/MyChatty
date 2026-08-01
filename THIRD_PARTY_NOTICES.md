@@ -1,14 +1,15 @@
 # Third-Party Notices
 
-## Mozilla Readability
+## Turndown
 
-MyChatty vendors `Readability.js` from Mozilla Readability for Web Browser page
-text extraction.
+MyChatty vendors Turndown 7.2.0 and turndown-plugin-gfm 1.0.2 for rendered
+DOM-to-Markdown conversion.
 
-- Location: `third_party/readability/Readability.js`
-- Upstream: https://github.com/mozilla/readability
-- Package name: `@mozilla/readability`
-- License: Apache License, Version 2.0
+- Locations: `third_party/turndown/turndown.js` and
+  `third_party/turndown/turndown-plugin-gfm.js`
+- Upstream: https://github.com/mixmark-io/turndown
+- Packages: `turndown` and `turndown-plugin-gfm`
+- License: MIT
 
-The Apache-2.0 license text is included at
-`third_party/readability/LICENSE.md`.
+The license texts are included at `third_party/turndown/LICENSE` and
+`third_party/turndown/LICENSE-plugin-gfm`.

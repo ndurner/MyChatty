@@ -39,9 +39,8 @@ without duplicating request serialization or streaming parsing code.
   [Exa](https://exa.ai/) search.
 - Optional Code Interpreter plugin for local JavaScript evaluation.
 - Optional Web Browser plugin that opens approved web pages in a local Qt
-  WebView, extracts readable text with Mozilla Readability, caches line-range
-  text slices, and can provide sequential screenshot tiles when enabled in
-  Advanced Settings.
+  WebView, converts the rendered DOM to Markdown, caches line-range text slices,
+  and can provide sequential screenshot tiles when enabled in Advanced Settings.
 - Local conversation persistence with a Recents sidebar.
 - Share/export to an `oai_chat`-style JSON shape: a top-level `messages` array
   containing system, user, and assistant messages.
@@ -187,12 +186,21 @@ The `+` attachment menu contains a Plugins section.
   sandbox for arithmetic, JSON/date/string processing, and scoped conversation
   files.
 - `Web Browser` advertises `open_web_page` and `read_web_page_text`. It opens
-  `http`/`https` URLs in a local Qt WebView, runs Mozilla Readability once,
-  caches the extracted text, and lets the model request later line ranges
-  without reloading the page. A provenance check allows exact URLs found in user
-  messages or provider web-search results. Model-constructed URLs pause for
-  inline Yes/No/Always approval before network access; Always applies to that
-  host for the current app session.
+  `http`/`https` URLs in a local Qt WebView, converts the rendered DOM to
+  GitHub-style Markdown with Turndown and its GFM plugin, and caches that single
+  extraction. Before conversion, the fixed `readability_boilerplate_v1` policy
+  removes scripts, hidden content, semantic navigation/dialog/menu regions,
+  forms, controls, page-level chrome, skip-link groups, and ancillary
+  recommendation/feedback modules. It also applies Readability-style
+  negative/positive semantic-name filtering with link-density tie-breaking.
+  Tool results report the policy, converter version, and removed-node count. The
+  model can request later line ranges without reloading the page. A provenance
+  check allows exact URLs found in user messages or provider web-search results.
+  Model-constructed URLs pause
+  for inline Yes/No/Always approval before network access; Always applies to
+  that host for the current app session. A page with no extractable DOM and an
+  actual Markdown conversion failure have distinct error codes. The tool does
+  not silently switch extraction methods.
 
 `Page Screenshots` lives in Settings under `Advanced Settings`. When enabled,
 and when the selected model supports images, Web Browser also advertises
@@ -267,15 +275,16 @@ API key is attached to the OpenAI MCP URL and can also be supplied to the CLI as
 
 ## Third-Party Code
 
-MyChatty vendors Mozilla Readability for Web Browser article extraction:
+MyChatty vendors Turndown 7.2.0 and turndown-plugin-gfm 1.0.2 for Web Browser
+rendered-DOM-to-Markdown conversion:
 
-- `third_party/readability/Readability.js`
-- Upstream: https://github.com/mozilla/readability
-- License: Apache License, Version 2.0
+- `third_party/turndown/turndown.js`
+- `third_party/turndown/turndown-plugin-gfm.js`
+- Upstream: https://github.com/mixmark-io/turndown
+- License: MIT
 
-The Apache-2.0 license text is included at
-`third_party/readability/LICENSE.md`, and a concise attribution notice is kept
-in `THIRD_PARTY_NOTICES.md`.
+The license texts are included under `third_party/turndown/`, and a concise
+attribution notice is kept in `THIRD_PARTY_NOTICES.md`.
 
 ## Storage And Export
 

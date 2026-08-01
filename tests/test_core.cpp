@@ -8,9 +8,11 @@
 #include "OpenaiResponsesAPI.h"
 #include "SseParser.h"
 #include "ToolExecutor.h"
+#include "WebPageText.h"
 
 #include <QJsonDocument>
 #include <QDir>
+#include <QFile>
 #include <QSignalSpy>
 #include <QTest>
 #include <QTemporaryFile>
@@ -691,6 +693,77 @@ private slots:
         });
         QVERIFY(result.value("success").toBool());
         QCOMPARE(result.value("prints").toString(), QString("true\n"));
+    }
+
+    void renderedDomMarkdownFinalizationPreservesStructuredRecordRows()
+    {
+        const QString body = QStringLiteral(R"MD(
+#### OpenAI: San Francisco, California, US
+
+2025-09-20 | Honorable Mention: OpenAI gpt-oss Red-Teaming Challenge
+
+Distinction
+
+#### NVIDIA Corporation: Santa Clara, California, US
+
+2024-08-02 | Honorable Mention: Generative AI Agents Developer Contest by NVIDIA and LangChain
+
+#### Method, apparatus and system for electronically signing a document
+
+2015-04-29 | Invention
+
+PAT: EP2866157A1
+
+#### Bootstrapping of Peer-to-Peer Networks
+
+2008-07 | Journal article
+)MD");
+
+        const QString markdown = finalizeRenderedMarkdown(QStringLiteral("Nils Durner"), body);
+        QVERIFY(markdown.startsWith(QStringLiteral("# Nils Durner")));
+        QVERIFY(markdown.contains(
+            QStringLiteral("2025-09-20 | Honorable Mention: OpenAI gpt-oss Red-Teaming Challenge")));
+        QVERIFY(markdown.contains(
+            QStringLiteral("2024-08-02 | Honorable Mention: Generative AI Agents Developer Contest")));
+        QVERIFY(markdown.indexOf(QStringLiteral("EP2866157A1"))
+            < markdown.indexOf(QStringLiteral("Bootstrapping of Peer-to-Peer Networks")));
+    }
+
+    void renderedDomMarkdownReportsConversionFailure()
+    {
+        QVERIFY(finalizeRenderedMarkdown(QStringLiteral("Example"), {}).isEmpty());
+    }
+
+    void renderedDomMarkdownBundlesPinnedConverterAndGfmPlugin()
+    {
+        QFile turndown(QStringLiteral(":/third_party/turndown/turndown.js"));
+        QVERIFY(turndown.open(QIODevice::ReadOnly));
+        QVERIFY(turndown.readAll().contains("var TurndownService"));
+
+        QFile gfm(QStringLiteral(":/third_party/turndown/turndown-plugin-gfm.js"));
+        QVERIFY(gfm.open(QIODevice::ReadOnly));
+        const QByteArray gfmSource = gfm.readAll();
+        QVERIFY(gfmSource.contains("var turndownPluginGfm"));
+        QVERIFY(gfmSource.contains("Only convert tables with a heading row"));
+    }
+
+    void renderedDomMarkdownDoesNotWrapOrFragmentInlineMarkup()
+    {
+        const QString body = QStringLiteral(
+            "Readability is the ease with which a "
+            "[**reader**](https://example.test/reading_(process) \"Reading\") can understand text.\n\n"
+            "## [Try it](https://example.test/try)\n\n"
+            "It models information as **surprise**.");
+        const QString markdown = finalizeRenderedMarkdown(
+            QStringLiteral("Article"),
+            body);
+
+        QVERIFY(markdown.contains(QStringLiteral(
+            "[**reader**](https://example.test/reading_(process) \"Reading\")")));
+        QVERIFY(markdown.contains(QStringLiteral(
+            "## [Try it](https://example.test/try)")));
+        QVERIFY(markdown.contains(QStringLiteral("information as **surprise**.")));
+        QVERIFY(!markdown.contains(QStringLiteral("**\nsurprise**")));
     }
 
     void openRouterPayloadReplaysToolMessages()

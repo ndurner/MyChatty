@@ -1,6 +1,7 @@
 #include "ToolExecutor.h"
 
 #include "ConversationFileStore.h"
+#include "WebPageText.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -208,31 +209,199 @@ bool loadPageSync(QWebView &view, const QUrl &url, int timeoutMs = 45000)
     return true;
 }
 
-QString readabilityText(QWebView &view)
+struct RenderedPageSnapshot {
+    QString rawBodyHtml;
+    QString bodyHtml;
+    QString bodyMarkdown;
+    QString conversionError;
+    int removedNodeCount = 0;
+};
+
+RenderedPageSnapshot renderedPageSnapshot(QWebView &view)
 {
-    const QString readability = readTextFile(QStringLiteral(":/third_party/readability/Readability.js"));
-    if (readability.isEmpty()) {
+    const QString converter = readTextFile(QStringLiteral(":/third_party/turndown/turndown.js"))
+        + QLatin1Char('\n')
+        + readTextFile(QStringLiteral(":/third_party/turndown/turndown-plugin-gfm.js"));
+    if (converter.trimmed().isEmpty()) {
+        return {{}, {}, {}, QStringLiteral("Markdown converter resources are unavailable"), 0};
+    }
+    const QString script = converter + QStringLiteral(R"JS(
+(() => {
+  if (!document.body) return JSON.stringify({ conversionError: "Page has no document body" });
+  const clone = document.body.cloneNode(true);
+  const rawBodyHtml = clone.innerHTML;
+  let removedNodeCount = 0;
+  const removeAll = selector => clone.querySelectorAll(selector).forEach(node => {
+    node.remove();
+    removedNodeCount += 1;
+  });
+  removeAll([
+    "script", "style", "noscript", "template", "svg", "canvas", "link", "meta",
+    "nav", "footer", "aside", "form", "fieldset", "object", "embed", "iframe",
+    "input", "textarea", "select", "button",
+    ".material-icons", ".material-icons-outlined", ".material-symbols-outlined",
+    ".material-symbols-rounded", ".google-symbols",
+    "[hidden]", "[aria-hidden='true']",
+    "[style*='display: none']", "[style*='display:none']",
+    "[style*='visibility: hidden']", "[style*='visibility:hidden']",
+    "[role='navigation']", "[role='banner']", "[role='contentinfo']",
+    "[role='dialog']", "[role='alertdialog']", "[role='search']",
+    "[role='menu']", "[role='menuitem']", "[role='toolbar']", "[role='tooltip']",
+    "[role='complementary']"
+  ].join(","));
+  clone.querySelectorAll("header").forEach(node => {
+    if (!node.closest("main, article")) {
+      node.remove();
+      removedNodeCount += 1;
+    }
+  });
+  const explicitUiName = /(?:^|[^a-z0-9])(dialog|jump[-_\s]?links?|menu|navigation|popup|sidebar|skip[-_\s]?links?)(?=$|[^a-z0-9])/i;
+  const ancillaryContentName = /(?:^|[^a-z0-9])((?:content|journey)[-_\s]?recs?|feedback[a-z]*|highly[-_\s]?rated|recommend(?:ation|ed)?s?|related|similar)(?=$|[^a-z0-9])/i;
+  const unlikelyName = /(?:^|[-_\s])(ad-break|agegate|banner|breadcrumbs|comment|community|disqus|extra|footer|gdpr|legends|menu|pager|pagination|popup|related|remark|replies|rss|share|shoutbox|sidebar|skyscraper|social|sponsor|supplemental)(?:$|[-_\s])/i;
+  const likelyContentName = /(?:^|[-_\s])(article|body|content|entry|hentry|main|page|post|story|text)(?:$|[-_\s])/i;
+  const linkDensity = node => {
+    const textLength = (node.textContent || "").trim().length;
+    if (!textLength) return 0;
+    const linkLength = Array.from(node.querySelectorAll("a"))
+      .reduce((length, link) => length + (link.textContent || "").trim().length, 0);
+    return linkLength / textLength;
+  };
+  const candidateName = node => ["class", "id", "aria-label", "data-testid"]
+    .map(attribute => node.getAttribute(attribute) || "").join(" ");
+  clone.querySelectorAll("[class], [id], [aria-label], [data-testid]").forEach(node => {
+    if (!node.parentNode || !ancillaryContentName.test(candidateName(node))) return;
+    let listItem = node.parentElement;
+    while (listItem && listItem.tagName !== "LI") listItem = listItem.parentElement;
+    (listItem || node).remove();
+    removedNodeCount += 1;
+  });
+  clone.querySelectorAll("[class], [id], [aria-label], [data-testid]").forEach(node => {
+    if (!node.parentNode) return;
+    const name = candidateName(node);
+    if (ancillaryContentName.test(name)) return;
+    const explicitUi = explicitUiName.test(name);
+    const likelyContent = likelyContentName.test(name);
+    const semanticContent = node.matches("main, article, h1, h2, h3, h4, h5, h6");
+    const density = linkDensity(node);
+    const conflictedUi = explicitUi && likelyContent && density >= 0.5;
+    const conflictedUnlikely = unlikelyName.test(name) && likelyContent && density >= 0.2;
+    if ((explicitUi && !semanticContent && (!likelyContent || conflictedUi))
+        || (unlikelyName.test(name) && (!likelyContent || conflictedUnlikely))) {
+      node.remove();
+      removedNodeCount += 1;
+    }
+  });
+  clone.querySelectorAll("li").forEach(node => {
+    if (!node.textContent.trim() && !node.querySelector("img, video, audio")) {
+      node.remove();
+      removedNodeCount += 1;
+    }
+  });
+  clone.querySelectorAll("ul, ol").forEach(node => {
+    if (!node.textContent.trim() && !node.querySelector("img, video, audio")) {
+      node.remove();
+      removedNodeCount += 1;
+    }
+  });
+  // turndown-plugin-gfm recognizes a header row only when its tbody is the
+  // table's first child. Colgroups are presentation metadata, but otherwise
+  // cause valid data tables to be emitted as raw HTML.
+  removeAll("colgroup");
+  const normalizedTableHeader = table => {
+    const row = table.rows && table.rows[0];
+    return row ? Array.from(row.cells)
+      .map(cell => (cell.textContent || "").trim().replace(/\s+/g, " "))
+      .join("\u001f") : "";
+  };
+  const tables = Array.from(clone.querySelectorAll("table"));
+  tables.forEach((table, index) => {
+    if (!table.parentNode || table.rows.length !== 1) return;
+    const header = normalizedTableHeader(table);
+    if (!header) return;
+    const duplicate = tables.slice(index + 1).some(candidate =>
+      candidate.rows.length > 1 && normalizedTableHeader(candidate) === header);
+    if (duplicate) {
+      table.remove();
+      removedNodeCount += 1;
+    }
+  });
+  clone.querySelectorAll("[href]").forEach(node => {
+    try { node.setAttribute("href", new URL(node.getAttribute("href"), document.baseURI).href); } catch (_) {}
+  });
+  clone.querySelectorAll("[src]").forEach(node => {
+    try { node.setAttribute("src", new URL(node.getAttribute("src"), document.baseURI).href); } catch (_) {}
+  });
+  const bodyHtml = clone.innerHTML;
+  let bodyMarkdown = "";
+  let conversionError = "";
+  try {
+    const service = new TurndownService({
+      headingStyle: "atx",
+      bulletListMarker: "-",
+      codeBlockStyle: "fenced",
+      fence: "```",
+      emDelimiter: "*",
+      strongDelimiter: "**"
+    });
+    service.use(turndownPluginGfm.gfm);
+    const hasMarkdownHeader = table => {
+      const firstRow = table && table.rows && table.rows[0];
+      return !!firstRow && Array.from(firstRow.cells)
+        .every(cell => cell.tagName === "TH");
+    };
+    const compactCellText = content => content
+      .replace(/\|/g, "\\|")
+      .replace(/\s+/g, " ")
+      .trim();
+    // Jina's Markify follows the same rule: table-cell contents are compacted
+    // onto one line. Turndown GFM otherwise leaves block-child newlines in a
+    // cell, producing invalid Markdown for common documentation tables.
+    service.addRule("compactGfmTableCell", {
+      filter: node => (node.tagName === "TH" || node.tagName === "TD")
+        && hasMarkdownHeader(node.closest("table")),
+      replacement: (content, node) => {
+        const prefix = node.cellIndex === 0 ? "| " : " ";
+        return prefix + compactCellText(content) + " |";
+      }
+    });
+    // GFM has no syntax for a table without a heading row. Follow Markify's
+    // non-lossy fallback and emit each row as compact plain text instead of
+    // preserving a large raw-HTML block.
+    service.addRule("plainTableCell", {
+      filter: node => (node.tagName === "TH" || node.tagName === "TD")
+        && !hasMarkdownHeader(node.closest("table")),
+      replacement: (content, node) => compactCellText(content)
+        + (node.cellIndex + 1 < node.parentElement.cells.length ? " | " : "")
+    });
+    service.addRule("plainTableRow", {
+      filter: node => node.tagName === "TR"
+        && !hasMarkdownHeader(node.closest("table")),
+      replacement: content => "\n" + content.trim() + "\n"
+    });
+    service.addRule("plainTable", {
+      filter: node => node.tagName === "TABLE" && !hasMarkdownHeader(node),
+      replacement: content => "\n\n" + content.trim() + "\n\n"
+    });
+    bodyMarkdown = service.turndown(clone);
+  } catch (error) {
+    conversionError = String(error && error.message ? error.message : error);
+  }
+  return JSON.stringify({ rawBodyHtml, bodyHtml, bodyMarkdown, conversionError, removedNodeCount });
+})()
+)JS");
+    const QJsonDocument result = QJsonDocument::fromJson(
+        runJavaScriptVariantSync(view, script, 10000).toString().toUtf8());
+    if (!result.isObject()) {
         return {};
     }
-    const QString script = QStringLiteral(R"JS(
-(() => {
-  const source = %1;
-  try {
-    (0, eval)(source);
-    const clone = document.cloneNode(true);
-    const article = new Readability(clone).parse();
-    if (!article) return "";
-    return [
-      article.title ? "# " + article.title : "",
-      article.excerpt || "",
-      article.textContent || ""
-    ].filter(Boolean).join("\n\n");
-  } catch (error) {
-    return "";
-  }
-})()
-)JS").arg(jsonStringLiteral(readability));
-    return runJavaScriptVariantSync(view, script, 10000).toString();
+    const QJsonObject object = result.object();
+    return {
+        object.value(QStringLiteral("rawBodyHtml")).toString(),
+        object.value(QStringLiteral("bodyHtml")).toString(),
+        object.value(QStringLiteral("bodyMarkdown")).toString(),
+        object.value(QStringLiteral("conversionError")).toString(),
+        object.value(QStringLiteral("removedNodeCount")).toInt(),
+    };
 }
 
 QJsonArray visibleLinks(QWebView &view)
@@ -363,17 +532,35 @@ QJsonObject ToolExecutor::openPage(const QJsonObject &arguments) const
         return toolError(QStringLiteral("Timed out loading page"));
     }
 
-    const QString visibleText = runJavaScriptVariantSync(
-        view,
-        QStringLiteral("document.body ? document.body.innerText : ''"),
-        10000).toString();
-    const QString articleText = readabilityText(view);
-    const QString chosenText = articleText.trimmed().isEmpty() ? visibleText : articleText;
+    const RenderedPageSnapshot snapshot = renderedPageSnapshot(view);
+    const QString chosenText = finalizeRenderedMarkdown(view.title(), snapshot.bodyMarkdown);
+    writeTextFile(QDir(dir).filePath(QStringLiteral("rendered-raw.html")), snapshot.rawBodyHtml);
+    writeTextFile(QDir(dir).filePath(QStringLiteral("rendered.html")), snapshot.bodyHtml);
+    if (chosenText.trimmed().isEmpty()) {
+        const bool pageWasEmpty = snapshot.bodyHtml.trimmed().isEmpty();
+        const QString errorCode = pageWasEmpty
+            ? QStringLiteral("no_extractable_dom")
+            : QStringLiteral("markdown_conversion_failed");
+        QString error = pageWasEmpty
+            ? QStringLiteral("The rendered page exposed no extractable DOM content")
+            : QStringLiteral("Could not convert the rendered page DOM to Markdown");
+        if (!snapshot.conversionError.isEmpty()) {
+            error += QStringLiteral(": %1").arg(snapshot.conversionError);
+        }
+        return QJsonObject{
+            {QStringLiteral("success"), false},
+            {QStringLiteral("error"), error},
+            {QStringLiteral("error_code"), errorCode},
+            {QStringLiteral("text_source"), QStringLiteral("rendered_dom_turndown")},
+            {QStringLiteral("text_cleanup"), QStringLiteral("readability_boilerplate_v1")},
+            {QStringLiteral("markdown_converter"), QStringLiteral("turndown_7.2.0_gfm_1.0.2")},
+            {QStringLiteral("removed_node_count"), snapshot.removedNodeCount},
+        };
+    }
     const QStringList lines = textLines(chosenText);
     const QJsonArray links = visibleLinks(view);
 
-    writeTextFile(QDir(dir).filePath(QStringLiteral("readability.txt")), articleText);
-    writeTextFile(QDir(dir).filePath(QStringLiteral("visible.txt")), visibleText);
+    writeTextFile(QDir(dir).filePath(QStringLiteral("rendered.md")), chosenText);
     writeTextFile(QDir(dir).filePath(QStringLiteral("text.txt")), chosenText);
 
     QJsonObject metadata{
@@ -381,7 +568,10 @@ QJsonObject ToolExecutor::openPage(const QJsonObject &arguments) const
         {QStringLiteral("requested_url"), urlText},
         {QStringLiteral("final_url"), view.url().toString()},
         {QStringLiteral("title"), view.title()},
-        {QStringLiteral("text_source"), articleText.trimmed().isEmpty() ? QStringLiteral("visible_text") : QStringLiteral("readability_text")},
+        {QStringLiteral("text_source"), QStringLiteral("rendered_dom_turndown")},
+        {QStringLiteral("text_cleanup"), QStringLiteral("readability_boilerplate_v1")},
+        {QStringLiteral("markdown_converter"), QStringLiteral("turndown_7.2.0_gfm_1.0.2")},
+        {QStringLiteral("removed_node_count"), snapshot.removedNodeCount},
         {QStringLiteral("line_count"), lines.size()},
         {QStringLiteral("link_count"), links.size()},
         {QStringLiteral("links"), links},
@@ -398,6 +588,9 @@ QJsonObject ToolExecutor::openPage(const QJsonObject &arguments) const
         {QStringLiteral("title"), view.title()},
         {QStringLiteral("final_url"), view.url().toString()},
         {QStringLiteral("text_source"), metadata.value(QStringLiteral("text_source"))},
+        {QStringLiteral("text_cleanup"), metadata.value(QStringLiteral("text_cleanup"))},
+        {QStringLiteral("markdown_converter"), metadata.value(QStringLiteral("markdown_converter"))},
+        {QStringLiteral("removed_node_count"), metadata.value(QStringLiteral("removed_node_count"))},
         {QStringLiteral("line_count"), lines.size()},
         {QStringLiteral("link_count"), links.size()},
         {QStringLiteral("links"), firstJsonArrayItems(links, 80)},

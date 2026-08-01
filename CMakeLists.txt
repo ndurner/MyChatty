@@ -46,14 +46,18 @@ add_library(mychatty_core STATIC
     src/core/SpeechService.h
     src/core/ToolExecutor.cpp
     src/core/ToolExecutor.h
+    src/core/WebPageText.cpp
+    src/core/WebPageText.h
 )
 target_include_directories(mychatty_core PUBLIC src/core)
 target_link_libraries(mychatty_core PUBLIC Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::WebView)
 
-qt_add_resources(mychatty_core "reader_resources"
+qt_add_resources(mychatty_core "web_page_converter"
     PREFIX "/"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}"
     FILES
-        third_party/readability/Readability.js
+        third_party/turndown/turndown.js
+        third_party/turndown/turndown-plugin-gfm.js
 )
 
 qt_add_executable(MyChatty
