@@ -224,12 +224,49 @@ Popup {
         }
 
         Flickable {
+            id: modelList
             visible: root.page === "models"
             width: parent.width
             height: root.height - 26 * 2 - 56 - 14 - 1 - 14
             contentWidth: width
             contentHeight: modelColumn.height
             clip: true
+            flickableDirection: Flickable.VerticalFlick
+
+            DragHandler {
+                target: null
+                acceptedDevices: PointerDevice.TouchScreen
+                xAxis.enabled: false
+                grabPermissions: PointerHandler.CanTakeOverFromAnything
+                property real startContentY: 0
+
+                function updateContentPosition() {
+                    const fingerDelta = centroid.scenePosition.y - centroid.scenePressPosition.y
+                    const minimum = modelList.originY
+                    const maximum = Math.max(minimum,
+                                             modelList.originY + modelList.contentHeight - modelList.height)
+                    modelList.contentY = Math.max(minimum,
+                                                  Math.min(maximum, startContentY - fingerDelta))
+                }
+
+                onActiveChanged: {
+                    if (active) {
+                        modelList.cancelFlick()
+                        startContentY = modelList.contentY
+                        updateContentPosition()
+                    } else {
+                        const velocity = -centroid.velocity.y
+                        modelList.returnToBounds()
+                        if (Math.abs(velocity) > 1)
+                            modelList.flick(0, velocity)
+                    }
+                }
+
+                onCentroidChanged: {
+                    if (active)
+                        updateContentPosition()
+                }
+            }
 
             Column {
                 id: modelColumn
