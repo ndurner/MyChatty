@@ -7,6 +7,7 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QStringList>
+#include <QTimer>
 
 int main(int argc, char *argv[])
 {
@@ -21,10 +22,13 @@ int main(int argc, char *argv[])
     MyChatty::ChatController chat(&settings);
     MyChatty::MarkdownRenderer markdown;
     QString initialUiState;
+    bool verifyQmlLoad = false;
     const QStringList arguments = app.arguments();
     for (const QString &argument : arguments) {
         if (argument.startsWith("--ui-state=")) {
             initialUiState = argument.mid(QString("--ui-state=").size());
+        } else if (argument == "--verify-qml-load") {
+            verifyQmlLoad = true;
         }
     }
 
@@ -37,6 +41,15 @@ int main(int argc, char *argv[])
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, []() { QCoreApplication::exit(-1); },
                      Qt::QueuedConnection);
+    if (verifyQmlLoad) {
+        QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,
+                         [&app](QObject *object, const QUrl &) {
+                             if (object) {
+                                 qInfo("MYCHATTY_QML_LOAD_OK");
+                                 QTimer::singleShot(0, &app, &QCoreApplication::quit);
+                             }
+                         });
+    }
     engine.loadFromModule("MyChatty", "Main");
     return app.exec();
 }

@@ -95,12 +95,13 @@ For the active Qt Creator debug build tree used during development:
 
 ```sh
 cmake --build build/Qt_6_12_0_for_macOS-Debug --target MyChatty
-"./build/Qt_6_12_0_for_macOS-Debug/bin/MyChatty.app/Contents/MacOS/MyChatty"
+scripts/verify_qml_load.sh "./build/Qt_6_12_0_for_macOS-Debug/bin/MyChatty.app"
 ```
 
 Do not treat a successful build as proof that QML loads. After QML changes,
-launch the exact app binary from the active build tree and check for
-`QQmlApplicationEngine failed to load component`.
+run the QML load verifier against the active app bundle. It launches through
+macOS LaunchServices, avoiding an AppKit startup failure that can occur when a
+GUI process is spawned directly from Codex.
 
 ## Run
 
