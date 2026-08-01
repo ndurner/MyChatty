@@ -20,6 +20,7 @@ static QJsonObject conversationToJson(const Conversation &conversation)
         {"title", conversation.title},
         {"provider", conversation.provider},
         {"model", conversation.model},
+        {"providerCategory", conversation.providerCategory},
         {"effort", conversation.effort},
         {"reasoningMode", conversation.reasoningMode},
         {"webBrowserAlwaysApproved", conversation.webBrowserAlwaysApproved},
@@ -36,6 +37,7 @@ static Conversation conversationFromJson(const QJsonObject &object)
     conversation.title = object.value("title").toString("New chat");
     conversation.provider = object.value("provider").toString();
     conversation.model = object.value("model").toString("Gemma 4 Free");
+    conversation.providerCategory = object.value("providerCategory").toString();
     if (conversation.provider.isEmpty()) {
         conversation.provider = ModelCatalog::modelForDisplayName(conversation.model).providerLabel;
     }

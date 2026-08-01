@@ -262,12 +262,17 @@ QVariantList ChatController::modelOptions() const
 QVariantList ChatController::effortOptions() const
 {
     return ModelCatalog::effortOptionsForModel(
-        ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel));
+        ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel, m_selectedProviderCategory));
 }
 
 QString ChatController::selectedModel() const
 {
     return m_selectedModel;
+}
+
+QString ChatController::selectedProviderCategory() const
+{
+    return m_selectedProviderCategory;
 }
 
 QString ChatController::selectedProvider() const
@@ -288,7 +293,7 @@ QString ChatController::selectedReasoningMode() const
 bool ChatController::supportsProReasoning() const
 {
     return ModelCatalog::supportsProReasoning(
-        ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel));
+        ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel, m_selectedProviderCategory));
 }
 
 QString ChatController::selectorLabel() const
@@ -296,12 +301,19 @@ QString ChatController::selectorLabel() const
     const QString mode = m_selectedReasoningMode.compare(QStringLiteral("Pro"), Qt::CaseInsensitive) == 0
         ? QStringLiteral(" Pro")
         : QString();
-    return QStringLiteral("%1 %2 %3%4").arg(m_selectedProvider, m_selectedModel, m_selectedEffort, mode);
+    const QString providerCategory = m_selectedProviderCategory.isEmpty()
+        ? QString()
+        : QStringLiteral(" (%1)").arg(m_selectedProviderCategory);
+    return QStringLiteral("%1 %2%3 %4%5").arg(m_selectedProvider, m_selectedModel, providerCategory, m_selectedEffort, mode);
 }
 
 QString ChatController::selectedMenuTitle() const
 {
-    return ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel).menuTitle;
+    const QString title = ModelCatalog::modelForProviderAndDisplayName(
+        m_selectedProvider, m_selectedModel, m_selectedProviderCategory).menuTitle;
+    return m_selectedProviderCategory.isEmpty()
+        ? title
+        : QStringLiteral("%1 (%2)").arg(title, m_selectedProviderCategory);
 }
 
 bool ChatController::busy() const
@@ -320,6 +332,24 @@ void ChatController::setSelectedModel(const QString &value)
         return;
     }
     m_selectedModel = value;
+    m_selectedProviderCategory.clear();
+    if (!supportsProReasoning() && m_selectedReasoningMode != QStringLiteral("Standard")) {
+        m_selectedReasoningMode = QStringLiteral("Standard");
+        emit selectedReasoningModeChanged();
+    }
+    normalizeSelectedEffort();
+    emit selectedModelChanged();
+    emit effortOptionsChanged();
+    emit selectorLabelChanged();
+}
+
+void ChatController::selectModel(const QString &model, const QString &providerCategory)
+{
+    if (m_selectedModel == model && m_selectedProviderCategory == providerCategory) {
+        return;
+    }
+    m_selectedModel = model;
+    m_selectedProviderCategory = providerCategory;
     if (!supportsProReasoning() && m_selectedReasoningMode != QStringLiteral("Standard")) {
         m_selectedReasoningMode = QStringLiteral("Standard");
         emit selectedReasoningModeChanged();
@@ -347,6 +377,7 @@ void ChatController::setSelectedProvider(const QString &value)
     }
     if (!hasSelectedModel && !options.isEmpty()) {
         m_selectedModel = options.first().toMap().value(QStringLiteral("displayName")).toString();
+        m_selectedProviderCategory.clear();
         emit selectedModelChanged();
     }
     if (!supportsProReasoning() && m_selectedReasoningMode != QStringLiteral("Standard")) {
@@ -440,7 +471,7 @@ void ChatController::appendAssistantAndBeginRequest()
 
     const ChatRequest request = makeRequest();
     if (hasImageAttachments(request.history) && !request.model.supportsImages) {
-        assistant.text = QStringLiteral("%1 does not support image input. Choose Gemma 4 Free, Kimi K2.6, or Kimi K3 for image analysis.")
+        assistant.text = QStringLiteral("%1 does not support image input. Choose Gemma 4 Free or Kimi K3 for image analysis.")
                              .arg(request.model.displayName);
         assistant.streaming = false;
         m_messages.update(assistantRow, assistant);
@@ -464,7 +495,7 @@ ChatRequest ChatController::makeRequest() const
 {
     ChatRequest request;
     request.history = m_messages.messages();
-    request.model = ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel);
+    request.model = ModelCatalog::modelForProviderAndDisplayName(m_selectedProvider, m_selectedModel, m_selectedProviderCategory);
     request.effort = m_selectedEffort;
     request.reasoningMode = m_selectedReasoningMode;
     request.customInstructions = m_settings ? m_settings->customInstructions() : QString();
@@ -973,6 +1004,7 @@ void ChatController::loadConversation(const QString &id)
             m_currentConversationId = conversation.id;
             m_conversationWebBrowserAlwaysApproved = conversation.webBrowserAlwaysApproved;
             m_selectedModel = conversation.model;
+            m_selectedProviderCategory = conversation.providerCategory;
             m_selectedProvider = conversation.provider.isEmpty()
                 ? ModelCatalog::modelForDisplayName(conversation.model).providerLabel
                 : conversation.provider;
@@ -1065,6 +1097,7 @@ void ChatController::persistCurrentConversation()
     conversation.id = m_currentConversationId.isEmpty() ? newId("conv") : m_currentConversationId;
     conversation.title = titleForConversation();
     conversation.model = m_selectedModel;
+    conversation.providerCategory = m_selectedProviderCategory;
     conversation.provider = m_selectedProvider;
     conversation.effort = m_selectedEffort;
     conversation.reasoningMode = m_selectedReasoningMode;

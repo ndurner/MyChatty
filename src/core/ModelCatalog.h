@@ -24,13 +24,15 @@ struct ModelInfo {
     bool supportsFiles = false;
     QJsonObject chatParameters;
     QString countryFlag;
+    QString providerCategory;
 };
 
 class ModelCatalog {
 public:
     static QList<ModelInfo> models();
     static ModelInfo modelForDisplayName(const QString &displayName);
-    static ModelInfo modelForProviderAndDisplayName(const QString &provider, const QString &displayName);
+    static ModelInfo modelForProviderAndDisplayName(const QString &provider, const QString &displayName,
+                                                    const QString &providerCategory = {});
     static ModelInfo modelForApiName(const QString &apiName);
     static QVariantList providerOptions();
     static QVariantList modelOptions();

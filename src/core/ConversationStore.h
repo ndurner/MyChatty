@@ -12,6 +12,7 @@ struct Conversation {
     QString title;
     QString provider;
     QString model;
+    QString providerCategory;
     QString effort;
     QString reasoningMode = QStringLiteral("Standard");
     bool webBrowserAlwaysApproved = false;

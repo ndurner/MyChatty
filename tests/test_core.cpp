@@ -113,19 +113,24 @@ private slots:
         QCOMPARE(glm.provider, ApiProvider::OpenRouterChat);
         QCOMPARE(glm.providerOnly, QStringList{"Parasail"});
         QVERIFY(!glm.supportsImages);
-        const ModelInfo kimi = ModelCatalog::modelForDisplayName("Kimi K2.6");
-        QCOMPARE(kimi.apiModel, QString("moonshotai/kimi-k2.6"));
-        QCOMPARE(kimi.provider, ApiProvider::OpenRouterChat);
-        QCOMPARE(kimi.providerOnly, QStringList{"NovitaAI"});
-        QCOMPARE(kimi.countryFlag, QString("🇺🇸"));
-        QVERIFY(kimi.supportsImages);
-        const ModelInfo kimiK3 = ModelCatalog::modelForDisplayName("Kimi K3");
+        const ModelInfo kimiK3 = ModelCatalog::modelForProviderAndDisplayName("OpenRouter", "Kimi K3", "PRC");
         QCOMPARE(kimiK3.apiModel, QString("moonshotai/kimi-k3"));
         QCOMPARE(kimiK3.provider, ApiProvider::OpenRouterChat);
         QCOMPARE(kimiK3.providerOnly, QStringList{"Moonshot AI"});
         QCOMPARE(kimiK3.countryFlag, QString("🇨🇳"));
+        QCOMPARE(kimiK3.providerCategory, QString("PRC"));
         QVERIFY(kimiK3.supportsImages);
         QVERIFY(!kimiK3.supportsFiles);
+        const ModelInfo kimiK3Us = ModelCatalog::modelForProviderAndDisplayName("OpenRouter", "Kimi K3", "US");
+        QCOMPARE(kimiK3Us.providerOnly, QStringList{"Together"});
+        QCOMPARE(kimiK3Us.countryFlag, QString("🇺🇸"));
+        ChatRequest kimiK3Request;
+        kimiK3Request.model = kimiK3;
+        QCOMPARE(buildOpenaiChatPayload(kimiK3Request).value("provider").toObject().value("only").toArray(),
+                 QJsonArray{QString("Moonshot AI")});
+        kimiK3Request.model = kimiK3Us;
+        QCOMPARE(buildOpenaiChatPayload(kimiK3Request).value("provider").toObject().value("only").toArray(),
+                 QJsonArray{QString("Together")});
 
         const QVariantList openRouterOptions = ModelCatalog::modelOptionsForProvider("OpenRouter");
         const auto optionFor = [&openRouterOptions](const QString &displayName) {
@@ -136,8 +141,11 @@ private slots:
             }
             return QVariantMap{};
         };
-        QCOMPARE(optionFor("Kimi K2.6").value("countryFlag").toString(), QString("🇺🇸"));
-        QCOMPARE(optionFor("Kimi K3").value("countryFlag").toString(), QString("🇨🇳"));
+        QVERIFY(optionFor("Kimi K2.6").isEmpty());
+        const QVariantList kimiK3Categories = optionFor("Kimi K3").value("providerCategories").toList();
+        QCOMPARE(kimiK3Categories.size(), 2);
+        QCOMPARE(kimiK3Categories[0].toMap().value("name").toString(), QString("PRC"));
+        QCOMPARE(kimiK3Categories[1].toMap().value("name").toString(), QString("US"));
         const ModelInfo gemma = ModelCatalog::modelForDisplayName("Gemma 4 Free");
         QCOMPARE(gemma.apiModel, QString("google/gemma-4-26b-a4b-it:free"));
         QCOMPARE(gemma.provider, ApiProvider::OpenRouterChat);
@@ -267,7 +275,6 @@ private slots:
         verify("OpenRouter", "Gemini Flash Lite", {{"Instant", "minimal"}, {"Medium", "medium"}, {"High", "high"}});
         verify("OpenRouter", "Gemini Pro Latest", {{"Instant", "low"}, {"Medium", "medium"}, {"High", "high"}});
         verify("OpenRouter", "GPT OSS 20B", {{"Instant", "low"}, {"Medium", "medium"}, {"High", "high"}});
-        verify("OpenRouter", "Kimi K2.6", {{"Default", ""}});
         verify("OpenRouter", "Kimi K3", {{"Default", ""}});
         verify("OpenRouter", "Gemma 4 Free", {{"Default", ""}});
 

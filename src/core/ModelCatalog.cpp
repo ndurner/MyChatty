@@ -15,8 +15,8 @@ QList<ModelInfo> ModelCatalog::models()
         {"5.6 Terra", "GPT-5.6 Terra", "openai/gpt-5.6-terra", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
         {"5.6 Luna", "GPT-5.6 Luna", "openai/gpt-5.6-luna", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
         {"GLM-5.2", "GLM-5.2", "z-ai/glm-5.2", ApiProvider::OpenRouterChat, "OpenRouter", {"Parasail"}, false, false},
-        {"Kimi K2.6", "Kimi K2.6", "moonshotai/kimi-k2.6", ApiProvider::OpenRouterChat, "OpenRouter", {"NovitaAI"}, true, false, {}, "🇺🇸"},
-        {"Kimi K3", "Kimi K3", "moonshotai/kimi-k3", ApiProvider::OpenRouterChat, "OpenRouter", {"Moonshot AI"}, true, false, {}, "🇨🇳"},
+        {"Kimi K3", "Kimi K3", "moonshotai/kimi-k3", ApiProvider::OpenRouterChat, "OpenRouter", {"Moonshot AI"}, true, false, {}, "🇨🇳", "PRC"},
+        {"Kimi K3", "Kimi K3", "moonshotai/kimi-k3", ApiProvider::OpenRouterChat, "OpenRouter", {"Together"}, true, false, {}, "🇺🇸", "US"},
         {"Gemini 3.5 Flash", "Gemini 3.5 Flash", "google/gemini-3.5-flash", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
         {"Gemini Flash Lite", "Gemini Flash Lite", "google/gemini-3.1-flash-lite", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
         {"Gemini Pro Latest", "Gemini Pro Latest", "~google/gemini-pro-latest", ApiProvider::OpenRouterChat, "OpenRouter", {}, true, true},
@@ -43,11 +43,14 @@ ModelInfo ModelCatalog::modelForDisplayName(const QString &displayName)
     return models().front();
 }
 
-ModelInfo ModelCatalog::modelForProviderAndDisplayName(const QString &provider, const QString &displayName)
+ModelInfo ModelCatalog::modelForProviderAndDisplayName(const QString &provider, const QString &displayName,
+                                                        const QString &providerCategory)
 {
     for (const auto &model : models()) {
         if (model.providerLabel.compare(provider, Qt::CaseInsensitive) == 0
-            && model.displayName.compare(displayName, Qt::CaseInsensitive) == 0) {
+            && model.displayName.compare(displayName, Qt::CaseInsensitive) == 0
+            && (providerCategory.isEmpty()
+                || model.providerCategory.compare(providerCategory, Qt::CaseInsensitive) == 0)) {
             return model;
         }
     }
@@ -114,6 +117,16 @@ QVariantList ModelCatalog::modelOptionsForProvider(const QString &provider)
             continue;
         }
         QVariantMap row;
+        for (const QVariant &existing : result) {
+            if (existing.toMap().value("displayName").toString() == model.displayName) {
+                row = existing.toMap();
+                break;
+            }
+        }
+        QVariantList providerCategories = row.value("providerCategories").toList();
+        if (!model.providerCategory.isEmpty()) {
+            providerCategories.append(QVariantMap{{"name", model.providerCategory}, {"countryFlag", model.countryFlag}});
+        }
         row["displayName"] = model.displayName;
         row["menuTitle"] = model.menuTitle;
         row["apiModel"] = model.apiModel;
@@ -121,7 +134,21 @@ QVariantList ModelCatalog::modelOptionsForProvider(const QString &provider)
         row["supportsImages"] = model.supportsImages;
         row["supportsFiles"] = model.supportsFiles;
         row["countryFlag"] = model.countryFlag;
-        result.append(row);
+        row["providerCategories"] = providerCategories;
+        if (providerCategories.size() > 1) {
+            row["countryFlag"] = QString();
+        }
+        bool replaced = false;
+        for (int i = 0; i < result.size(); ++i) {
+            if (result[i].toMap().value("displayName").toString() == model.displayName) {
+                result[i] = row;
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced) {
+            result.append(row);
+        }
     }
     return result;
 }
@@ -163,8 +190,7 @@ QVariantList ModelCatalog::effortOptionsForModel(const ModelInfo &model)
         || apiModel == QStringLiteral("openai/gpt-oss-20b")) {
         return {"Instant", "Medium", "High"};
     }
-    if (apiModel == QStringLiteral("moonshotai/kimi-k2.6")
-        || apiModel == QStringLiteral("moonshotai/kimi-k3")
+    if (apiModel == QStringLiteral("moonshotai/kimi-k3")
         || apiModel == QStringLiteral("google/gemma-4-26b-a4b-it:free")) {
         return {"Default"};
     }

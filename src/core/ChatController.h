@@ -25,6 +25,7 @@ class ChatController : public QObject {
     Q_PROPERTY(QVariantList effortOptions READ effortOptions NOTIFY effortOptionsChanged)
     Q_PROPERTY(QString selectedProvider READ selectedProvider WRITE setSelectedProvider NOTIFY selectedProviderChanged)
     Q_PROPERTY(QString selectedModel READ selectedModel WRITE setSelectedModel NOTIFY selectedModelChanged)
+    Q_PROPERTY(QString selectedProviderCategory READ selectedProviderCategory NOTIFY selectedModelChanged)
     Q_PROPERTY(QString selectedEffort READ selectedEffort WRITE setSelectedEffort NOTIFY selectedEffortChanged)
     Q_PROPERTY(QString selectedReasoningMode READ selectedReasoningMode WRITE setSelectedReasoningMode NOTIFY selectedReasoningModeChanged)
     Q_PROPERTY(bool supportsProReasoning READ supportsProReasoning NOTIFY selectedModelChanged)
@@ -43,6 +44,7 @@ public:
     QVariantList effortOptions() const;
     QString selectedProvider() const;
     QString selectedModel() const;
+    QString selectedProviderCategory() const;
     QString selectedEffort() const;
     QString selectedReasoningMode() const;
     bool supportsProReasoning() const;
@@ -57,6 +59,7 @@ public:
     void setSelectedReasoningMode(const QString &value);
 
     Q_INVOKABLE void sendMessage(const QString &text);
+    Q_INVOKABLE void selectModel(const QString &model, const QString &providerCategory = {});
     Q_INVOKABLE void attachFiles(const QVariant &urls, const QString &origin);
     Q_INVOKABLE void removePendingAttachment(const QString &id);
     Q_INVOKABLE void copyMessage(int row);
@@ -136,6 +139,7 @@ private:
     QString m_currentConversationId;
     QString m_selectedProvider = "OpenRouter";
     QString m_selectedModel = "Gemma 4 Free";
+    QString m_selectedProviderCategory;
     QString m_selectedEffort = "Medium";
     QString m_selectedReasoningMode = "Standard";
     bool m_busy = false;

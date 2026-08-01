@@ -5,13 +5,14 @@ Popup {
     id: root
     property var controller
     property string page: "effort"
+    property var selectedModelOption: null
 
     modal: true
     dim: false
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     width: Math.min(300, parent ? parent.width - 72 : 300)
-    height: page === "models" ? 548 : 512
+    height: (page === "models" || page === "subcategories") ? 548 : 512
     x: parent ? (parent.width - width) / 2 : 80
     y: 78
 
@@ -287,8 +288,15 @@ Popup {
                         height: 52
                         padding: 0
                         onClicked: {
-                            controller.selectedModel = modelData.displayName
-                            root.close()
+                            if (modelData.providerCategories.length > 1) {
+                                root.selectedModelOption = modelData
+                                root.page = "subcategories"
+                            } else {
+                                controller.selectModel(modelData.displayName,
+                                                       modelData.providerCategories.length === 1
+                                                           ? modelData.providerCategories[0].name : "")
+                                root.close()
+                            }
                         }
                         background: Rectangle {
                             radius: 14
@@ -330,6 +338,61 @@ Popup {
                                 horizontalAlignment: Text.AlignRight
                                 verticalAlignment: Text.AlignVCenter
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        Column {
+            visible: root.page === "subcategories"
+            width: parent.width
+            spacing: 5
+            Text {
+                text: root.selectedModelOption ? root.selectedModelOption.displayName : ""
+                color: "#999999"
+                font.pixelSize: 18
+                leftPadding: 35
+                height: 38
+                verticalAlignment: Text.AlignVCenter
+            }
+            Repeater {
+                model: root.selectedModelOption ? root.selectedModelOption.providerCategories : []
+                delegate: Button {
+                    width: parent.width
+                    height: 52
+                    padding: 0
+                    onClicked: {
+                        controller.selectModel(root.selectedModelOption.displayName, modelData.name)
+                        root.close()
+                    }
+                    background: Rectangle {
+                        radius: 14
+                        color: down ? "#e6e6e6" : "transparent"
+                    }
+                    contentItem: Item {
+                        Text {
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 36
+                            text: controller.selectedModel === root.selectedModelOption.displayName
+                                  && controller.selectedProviderCategory === modelData.name ? "✓" : ""
+                            font.pixelSize: 20
+                            color: "#111111"
+                        }
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 36
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: modelData.name
+                            font.pixelSize: 20
+                            color: "#111111"
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: modelData.countryFlag
+                            font.pixelSize: 22
                         }
                     }
                 }
