@@ -101,11 +101,49 @@ ApplicationWindow {
         anchors.rightMargin: 0
         clip: true
         spacing: 4
+        flickableDirection: Flickable.VerticalFlick
+        cacheBuffer: Math.max(0, Math.round(height * 1.5))
         model: chatController.messages
         delegate: ChatBubble {
             controller: chatController
             onEditRequested: function(row, text) {
                 composer.startEdit(row, text)
+            }
+        }
+
+        DragHandler {
+            id: touchScroll
+            target: null
+            acceptedDevices: PointerDevice.TouchScreen
+            xAxis.enabled: false
+            grabPermissions: PointerHandler.CanTakeOverFromAnything
+            property real startContentY: 0
+
+            function updateContentPosition() {
+                const fingerDelta = centroid.scenePosition.y - centroid.scenePressPosition.y
+                const minimum = chatList.originY
+                const maximum = Math.max(minimum,
+                                         chatList.originY + chatList.contentHeight - chatList.height)
+                chatList.contentY = Math.max(minimum,
+                                             Math.min(maximum, startContentY - fingerDelta))
+            }
+
+            onActiveChanged: {
+                if (active) {
+                    chatList.cancelFlick()
+                    startContentY = chatList.contentY
+                    updateContentPosition()
+                } else {
+                    const velocity = -centroid.velocity.y
+                    chatList.returnToBounds()
+                    if (Math.abs(velocity) > 1)
+                        chatList.flick(0, velocity)
+                }
+            }
+
+            onCentroidChanged: {
+                if (active)
+                    updateContentPosition()
             }
         }
     }

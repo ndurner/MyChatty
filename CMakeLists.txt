@@ -84,6 +84,7 @@ qt_add_qml_module(MyChatty
         src/app/qml/LabeledSecretField.qml
         src/app/qml/MicrophoneIcon.qml
         src/app/qml/ModelEffortSelector.qml
+        src/app/qml/SelectableTextEdit.qml
         src/app/qml/SettingsSheet.qml
         src/app/qml/Sidebar.qml
 )

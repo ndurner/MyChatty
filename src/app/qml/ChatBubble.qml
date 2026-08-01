@@ -150,7 +150,7 @@ Item {
                 radius: 26
                 color: "#000000"
 
-                TextEdit {
+                SelectableTextEdit {
                     id: userText
                     anchors.fill: parent
                     anchors.margins: 17
@@ -214,7 +214,7 @@ Item {
             width: parent.width
             spacing: 12
 
-            TextEdit {
+            SelectableTextEdit {
                 visible: root.hasUsefulReasoning(reasoning)
                 width: parent.width
                 text: root.displayReasoning(reasoning)
@@ -236,7 +236,7 @@ Item {
                     delegate: Rectangle {
                         id: toolCard
                         width: parent.width
-                        implicitHeight: toolHeader.height + (expanded ? detailWrap.implicitHeight + 10 : 0)
+                        implicitHeight: toolHeader.height + (detailLoader.active ? detailLoader.height + 10 : 0)
                         height: implicitHeight
                         radius: 8
                         color: "#eef1f5"
@@ -286,69 +286,76 @@ Item {
                                 }
                             }
 
-                            Rectangle {
-                                id: detailWrap
-                                visible: toolCard.expanded
+                            Loader {
+                                id: detailLoader
+                                active: toolCard.expanded
+                                asynchronous: true
+                                visible: active
                                 width: parent.width - 14
                                 x: 7
-                                implicitHeight: toolDetailsColumn.implicitHeight + 18
-                                radius: 6
-                                color: "#dfe5ee"
-                                Column {
-                                    id: toolDetailsColumn
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.margins: 9
-                                    spacing: 10
-                                    Column {
-                                        visible: !modelData.isOutput
-                                        width: parent.width
-                                        spacing: 4
-                                        Text {
-                                            width: parent.width
-                                            text: modelData.label + " arguments"
-                                            color: "#526070"
-                                            font.pixelSize: 12
-                                            font.weight: Font.DemiBold
-                                            elide: Text.ElideRight
-                                        }
-                                        TextEdit {
-                                            width: parent.width
-                                            text: modelData.arguments
-                                            textFormat: TextEdit.PlainText
-                                            wrapMode: TextEdit.Wrap
-                                            readOnly: true
-                                            selectByMouse: true
-                                            selectByKeyboard: true
-                                            color: "#26313f"
-                                            font.family: "Menlo"
-                                            font.pixelSize: 12
-                                        }
-                                    }
-                                    Column {
-                                        visible: modelData.hasOutput || modelData.isOutput
-                                        width: parent.width
-                                        spacing: 4
-                                        Text {
-                                            width: parent.width
-                                            text: "Result"
-                                            color: "#526070"
-                                            font.pixelSize: 12
-                                            font.weight: Font.DemiBold
-                                            elide: Text.ElideRight
-                                        }
-                                        TextEdit {
-                                            width: parent.width
-                                            text: modelData.output
-                                            textFormat: TextEdit.PlainText
-                                            wrapMode: TextEdit.Wrap
-                                            readOnly: true
-                                            selectByMouse: true
-                                            selectByKeyboard: true
-                                            color: "#26313f"
-                                            font.family: "Menlo"
-                                            font.pixelSize: 12
+                                height: item ? item.implicitHeight : 0
+                                sourceComponent: Component {
+                                    Rectangle {
+                                        implicitHeight: toolDetailsColumn.implicitHeight + 18
+                                        radius: 6
+                                        color: "#dfe5ee"
+                                        Column {
+                                            id: toolDetailsColumn
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.top: parent.top
+                                            anchors.margins: 9
+                                            spacing: 10
+                                            Column {
+                                                visible: !modelData.isOutput
+                                                width: parent.width
+                                                spacing: 4
+                                                Text {
+                                                    width: parent.width
+                                                    text: modelData.label + " arguments"
+                                                    color: "#526070"
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    elide: Text.ElideRight
+                                                }
+                                                SelectableTextEdit {
+                                                    width: parent.width
+                                                    text: modelData.arguments
+                                                    textFormat: TextEdit.PlainText
+                                                    wrapMode: TextEdit.Wrap
+                                                    readOnly: true
+                                                    selectByMouse: true
+                                                    selectByKeyboard: true
+                                                    color: "#26313f"
+                                                    font.family: "Menlo"
+                                                    font.pixelSize: 12
+                                                }
+                                            }
+                                            Column {
+                                                visible: modelData.hasOutput || modelData.isOutput
+                                                width: parent.width
+                                                spacing: 4
+                                                Text {
+                                                    width: parent.width
+                                                    text: "Result"
+                                                    color: "#526070"
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    elide: Text.ElideRight
+                                                }
+                                                SelectableTextEdit {
+                                                    width: parent.width
+                                                    text: modelData.output
+                                                    textFormat: TextEdit.PlainText
+                                                    wrapMode: TextEdit.Wrap
+                                                    readOnly: true
+                                                    selectByMouse: true
+                                                    selectByKeyboard: true
+                                                    color: "#26313f"
+                                                    font.family: "Menlo"
+                                                    font.pixelSize: 12
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -385,7 +392,7 @@ Item {
                         wrapMode: Text.Wrap
                     }
 
-                    TextEdit {
+                    SelectableTextEdit {
                         width: parent.width
                         text: root.approval.url || ""
                         textFormat: TextEdit.PlainText
@@ -506,7 +513,7 @@ Item {
 
     Component {
         id: paragraphComponent
-        TextEdit {
+        SelectableTextEdit {
             property var block
             width: parent.width
             text: block.html
@@ -523,7 +530,7 @@ Item {
 
     Component {
         id: headingComponent
-        TextEdit {
+        SelectableTextEdit {
             property var block
             width: parent.width
             text: block.html
@@ -550,7 +557,7 @@ Item {
             color: "#f4f4f4"
             border.color: "#e5e5e5"
             clip: true
-            TextEdit {
+            SelectableTextEdit {
                 id: codeText
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -593,7 +600,7 @@ Item {
                 radius: 2
                 color: "#dddddd"
             }
-            TextEdit {
+            SelectableTextEdit {
                 id: quoteText
                 x: 13
                 width: parent.width - 13
@@ -638,7 +645,7 @@ Item {
                         font.pixelSize: 20
                         horizontalAlignment: Text.AlignRight
                     }
-                    TextEdit {
+                    SelectableTextEdit {
                         width: parent.width - 32
                         text: modelData.html
                         textFormat: TextEdit.RichText
@@ -680,7 +687,7 @@ Item {
                             height: Math.max(40, headerText.implicitHeight + 18)
                             color: "#f1f1f1"
                             border.color: "#e2e2e2"
-                            TextEdit {
+                            SelectableTextEdit {
                                 id: headerText
                                 anchors.fill: parent
                                 anchors.margins: 8
@@ -711,7 +718,7 @@ Item {
                                 height: Math.max(38, cellText.implicitHeight + 16)
                                 color: "#ffffff"
                                 border.color: "#e9e9e9"
-                                TextEdit {
+                                SelectableTextEdit {
                                     id: cellText
                                     anchors.fill: parent
                                     anchors.margins: 8
